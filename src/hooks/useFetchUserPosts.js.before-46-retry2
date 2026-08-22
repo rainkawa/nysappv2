@@ -1,0 +1,123 @@
+import {
+  useEffect,
+  useState,
+} from "react";
+import {
+  collection,
+  doc,
+  query,
+  orderBy,
+  limit,
+  onSnapshot,
+} from "firebase/firestore";
+import { db } from "../services/firebase";
+
+const normalizePost = (
+  post
+) => {
+  const data =
+    post.data() || {};
+
+  return {
+    id: post.id,
+    ...data,
+
+    comments:
+      Array.isArray(
+        data.comments
+      )
+        ? data.comments
+        : [],
+
+    new_likes:
+      Array.isArray(
+        data.new_likes
+      )
+        ? data.new_likes
+        : [],
+  };
+};
+
+const useFetchUserPosts = (
+  email
+) => {
+  const [posts, setPosts] =
+    useState([]);
+
+  const [loadLimit, setLoadLimit] =
+    useState(20);
+
+  const [loader, setLoader] =
+    useState(false);
+
+  useEffect(() => {
+    if (!email) {
+      setPosts([]);
+      setLoader(false);
+      return undefined;
+    }
+
+    setLoader(true);
+
+    const postsRef = collection(
+      doc(db, "users", email),
+      "posts"
+    );
+
+    const postsQuery = query(
+      postsRef,
+      orderBy(
+        "createdAt",
+        "desc"
+      ),
+      limit(loadLimit)
+    );
+
+    const unsubscribe = onSnapshot(
+      postsQuery,
+      (snapshot) => {
+        const nextPosts =
+          snapshot.docs.map(
+            normalizePost
+          );
+
+        setPosts(nextPosts);
+        setLoader(false);
+      },
+      (error) => {
+        console.error(
+          "useFetchUserPosts error:",
+          error
+        );
+
+        setPosts([]);
+        setLoader(false);
+      }
+    );
+
+    return unsubscribe;
+  }, [
+    email,
+    loadLimit,
+  ]);
+
+  const fetchOlderPosts = () => {
+    setLoadLimit(
+      (previous) =>
+        previous + 10
+    );
+  };
+
+  const refreshPosts = () => {
+    setLoadLimit(20);
+  };
+
+  return {
+    posts,
+    loader,
+    fetchOlderPosts,
+    refreshPosts,
+  };
+};
+
+export default useFetchUserPosts;
