@@ -4,7 +4,6 @@ import {
   View,
   TouchableOpacity,
   Modal,
-  TouchableWithoutFeedback,
   Platform,
 } from "react-native";
 import { useState } from "react";
@@ -13,135 +12,182 @@ import RemoveFollower from "./RemoveFollower";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import useCheckStoriesSeen from "../../hooks/useCheckStoriesSeen";
-import { SIZES } from "../../constants";
 
-const Followers = ({ user, currentUser, navigation }) => {
+const Followers = ({
+  user,
+  currentUser,
+  navigation,
+}) => {
   const {
     checkStoriesSeen,
   } = useCheckStoriesSeen();
 
-  const { handleFollow } = useHandleFollow({
-    user,
-  });
+  const {
+    handleFollow,
+  } = useHandleFollow();
 
-  const [modalVisible, setModalVisible] = useState(false);
+  const [
+    modalVisible,
+    setModalVisible,
+  ] = useState(false);
 
-  if (!user?.email || !currentUser?.email) {
+  if (
+    !user?.email ||
+    !currentUser?.email
+  ) {
     return null;
   }
 
-  const following = Array.isArray(currentUser.following)
-    ? currentUser.following
-    : [];
+  const following =
+    Array.isArray(
+      currentUser.following
+    )
+      ? currentUser.following
+      : [];
 
-  const followingRequest = Array.isArray(
-    currentUser.following_request
-  )
-    ? currentUser.following_request
-    : [];
+  const followingRequest =
+    Array.isArray(
+      currentUser.following_request
+    )
+      ? currentUser.following_request
+      : [];
 
-  const isFollowing = following.includes(user.email);
-  const isRequested = followingRequest.includes(
-    user.email
-  );
+  const isSelf =
+    currentUser.email === user.email;
+
+  const isFollowing =
+    following.includes(user.email);
+
+  const isRequested =
+    followingRequest.includes(
+      user.email
+    );
 
   const handleModal = () => {
-    setModalVisible((previous) => !previous);
+    setModalVisible(
+      (previous) => !previous
+    );
   };
 
   const handleViewProfile = () => {
-    navigation.navigate("UserDetail", {
-      email: user.email,
-    });
+    if (isSelf) {
+      navigation.navigate("Profile");
+      return;
+    }
+
+    navigation.navigate(
+      "UserDetail",
+      {
+        email: user.email,
+      }
+    );
   };
 
   const handleFollowPress = () => {
-    if (!isFollowing && !isRequested) {
-      handleFollow(user.email);
+    if (
+      isSelf ||
+      isFollowing
+    ) {
+      return;
     }
+
+    handleFollow(user.email);
   };
 
-  const storySeen = checkStoriesSeen(
-    user.username,
-    currentUser.email
-  );
+  const storySeen =
+    checkStoriesSeen(
+      user.username,
+      currentUser.email
+    );
 
   return (
     <View style={styles.container}>
-      <TouchableWithoutFeedback
+      <TouchableOpacity
         onPress={handleViewProfile}
+        style={styles.rowContainer}
+        activeOpacity={0.8}
       >
-        <View style={styles.rowContainer}>
-          {storySeen ? (
-            <LinearGradient
-              start={[0.9, 0.45]}
-              end={[0.07, 1.03]}
-              colors={[
-                "#ff00ff",
-                "#ff4400",
-                "#ffff00",
-              ]}
-              style={styles.rainbowBorder}
-            >
-              <Image
-                source={{
-                  uri: user.profile_picture || "",
-                }}
-                style={styles.image}
-              />
-            </LinearGradient>
-          ) : (
+        {storySeen ? (
+          <LinearGradient
+            start={[0.9, 0.45]}
+            end={[0.07, 1.03]}
+            colors={[
+              "#ff00ff",
+              "#ff4400",
+              "#ffff00",
+            ]}
+            style={styles.rainbowBorder}
+          >
             <Image
               source={{
-                uri: user.profile_picture || "",
+                uri:
+                  user.profile_picture ||
+                  "",
               }}
-              style={styles.nonRainbowImage}
+              style={styles.image}
             />
-          )}
+          </LinearGradient>
+        ) : (
+          <Image
+            source={{
+              uri:
+                user.profile_picture ||
+                "",
+            }}
+            style={styles.nonRainbowImage}
+          />
+        )}
 
-          <View style={styles.userContainer}>
-            <View style={styles.innerRow}>
-              <Text
-                numberOfLines={1}
-                style={styles.username}
-              >
-                {user.username || "Unknown user"}
-              </Text>
+        <View style={styles.userContainer}>
+          <Text
+            numberOfLines={1}
+            style={styles.username}
+          >
+            {user.username ||
+              "Unknown user"}
+          </Text>
 
-              {!isFollowing && (
-                <TouchableOpacity
-                  onPress={handleFollowPress}
-                  disabled={isRequested}
-                >
-                  <Text
-                    style={
-                      isRequested
-                        ? styles.buttonTextRequested
-                        : styles.buttonTextFollow
-                    }
-                  >
-                    {isRequested
-                      ? " • Requested"
-                      : " • Follow"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <Text style={styles.name}>
-              {user.name || ""}
-            </Text>
-          </View>
-        </View>
-      </TouchableWithoutFeedback>
-
-      <TouchableOpacity onPress={handleModal}>
-        <View style={styles.button}>
-          <Text style={styles.removeText}>
-            Remove
+          <Text
+            numberOfLines={1}
+            style={styles.name}
+          >
+            {user.name || ""}
           </Text>
         </View>
       </TouchableOpacity>
+
+      {!isSelf &&
+        (isFollowing ? (
+          <TouchableOpacity
+            onPress={handleModal}
+          >
+            <View style={styles.button}>
+              <Text style={styles.buttonText}>
+                Following
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={handleFollowPress}
+          >
+            <View
+              style={
+                isRequested
+                  ? styles.button
+                  : styles.blueButton
+              }
+            >
+              <Text style={styles.buttonText}>
+                {isRequested
+                  ? "Requested"
+                  : user?.isPrivate === true
+                  ? "Request"
+                  : "Follow"}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
 
       <Modal
         animationType="slide"
@@ -164,41 +210,38 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     marginHorizontal: 12,
-    marginTop: 15,
+    marginTop: 10,
   },
 
   rowContainer: {
     flexDirection: "row",
-    flex: 1,
-  },
-
-  innerRow: {
-    flexDirection: "row",
     alignItems: "center",
+    flex: 1,
   },
 
   rainbowBorder: {
     borderRadius: 100,
-    height: 64,
-    width: 64,
+    height: 52,
+    width: 52,
     justifyContent: "center",
     alignItems: "center",
   },
 
   image: {
-    height: 60,
-    width: 60,
+    height: 49,
+    width: 49,
     borderRadius: 100,
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: "#000",
   },
 
   nonRainbowImage: {
-    height: 64,
-    width: 64,
-    borderWidth: 3,
+    height: 52,
+    width: 52,
+    borderWidth: 2,
     borderColor: "#000",
     borderRadius: 100,
   },
@@ -209,21 +252,17 @@ const styles = StyleSheet.create({
   },
 
   username: {
-    marginLeft: 12,
+    marginLeft: 10,
     color: "#fff",
     fontWeight: "700",
-    fontSize: 14,
-    maxWidth: SIZES.Width * 0.29,
+    fontSize: 13,
   },
 
   name: {
     marginTop: 2,
-    marginLeft: 12,
-    color: "#999",
-    fontSize: 13,
-    fontWeight: "400",
-    width: SIZES.Width * 0.45,
-    marginBottom: 4,
+    marginLeft: 10,
+    color: "#888",
+    fontSize: 12,
   },
 
   button: {
@@ -231,32 +270,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     height:
-      Platform.OS === "android" ? 36 : 32,
-    width: 90,
-    borderRadius: 10,
+      Platform.OS === "android"
+        ? 32
+        : 30,
+    width: 88,
+    borderRadius: 9,
   },
 
-  buttonTextFollow: {
-    color: "#08f",
-    fontWeight: "700",
-    fontSize: 13,
-    marginBottom:
-      Platform.OS === "android" ? -3 : 0,
+  blueButton: {
+    backgroundColor: "#08f",
+    justifyContent: "center",
+    alignItems: "center",
+    height:
+      Platform.OS === "android"
+        ? 32
+        : 30,
+    width: 82,
+    borderRadius: 9,
   },
 
-  buttonTextRequested: {
+  buttonText: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 13,
-    marginBottom:
-      Platform.OS === "android" ? -3 : 0,
-  },
-
-  removeText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 13,
-    marginBottom:
-      Platform.OS === "android" ? 4 : 0,
+    fontSize: 12,
   },
 });

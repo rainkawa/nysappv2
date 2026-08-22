@@ -81,7 +81,6 @@ const SignupForm = ({ navigation }) => {
         following: [],
         followers_request: [],
         following_request: [],
-        isPrivate: false,
         event_notification: 0,
         chat_notification: 0,
         saved_posts: [],

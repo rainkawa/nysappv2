@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   doc,
-  getDoc,
   updateDoc,
   arrayUnion,
   Timestamp,
@@ -11,13 +10,23 @@ import {
 } from "firebase/firestore";
 import { db } from "../services/firebase";
 
-const useUploadComment = (post, currentUser) => {
-  const [isLoading, setIsLoading] = useState(false);
+const useUploadComment = (
+  post,
+  currentUser
+) => {
+  const [isLoading, setIsLoading] =
+    useState(false);
 
-  const uploadComment = async (value) => {
-    if (isLoading) return false;
+  const uploadComment = async (
+    value
+  ) => {
+    if (isLoading) {
+      return false;
+    }
 
-    const commentText = String(value || "").trim();
+    const commentText = String(
+      value || ""
+    ).trim();
 
     if (
       !commentText ||
@@ -31,6 +40,29 @@ const useUploadComment = (post, currentUser) => {
     setIsLoading(true);
 
     try {
+      const createdAt =
+        Timestamp.now();
+
+      const newComment = {
+        email:
+          currentUser.email,
+
+        profile_picture:
+          currentUser.profile_picture ||
+          "",
+
+        username:
+          currentUser.username ||
+          "",
+
+        comment:
+          commentText,
+
+        createdAt,
+
+        likes_by_users: [],
+      };
+
       const postRef = doc(
         db,
         "users",
@@ -39,35 +71,20 @@ const useUploadComment = (post, currentUser) => {
         post.id
       );
 
-      const snapshot = await getDoc(postRef);
+      await updateDoc(
+        postRef,
+        {
+          comments:
+            arrayUnion(
+              newComment
+            ),
+        }
+      );
 
-      if (!snapshot.exists()) {
-        console.log("No such post document!");
-        return false;
-      }
-
-      const createdAt = Timestamp.now();
-
-      const newComment = {
-        email: currentUser.email,
-        profile_picture: currentUser.profile_picture || "",
-        username: currentUser.username || "",
-        comment: commentText,
-        createdAt,
-        likes_by_users: [],
-      };
-
-      await updateDoc(postRef, {
-        comments: arrayUnion(newComment),
-      });
-
-      if (post.owner_email !== currentUser.email) {
-        const ownerRef = doc(
-          db,
-          "users",
-          post.owner_email
-        );
-
+      if (
+        post.owner_email !==
+        currentUser.email
+      ) {
         await addDoc(
           collection(
             db,
@@ -77,26 +94,55 @@ const useUploadComment = (post, currentUser) => {
           ),
           {
             type: "comment",
-            actorEmail: currentUser.email,
-            actorUsername: currentUser.username || "",
+
+            actorEmail:
+              currentUser.email,
+
+            actorUsername:
+              currentUser.username ||
+              "",
+
             actorProfilePicture:
-              currentUser.profile_picture || "",
-            postId: post.id,
-            postOwnerEmail: post.owner_email,
-            postImage: post.imageUrl || "",
-            comment: commentText,
+              currentUser.profile_picture ||
+              "",
+
+            postId:
+              post.id,
+
+            postOwnerEmail:
+              post.owner_email,
+
+            postImage:
+              post.imageUrl ||
+              "",
+
+            comment:
+              commentText,
+
             createdAt,
           }
         );
 
-        await updateDoc(ownerRef, {
-          event_notification: increment(1),
-        });
+        await updateDoc(
+          doc(
+            db,
+            "users",
+            post.owner_email
+          ),
+          {
+            event_notification:
+              increment(1),
+          }
+        );
       }
 
       return true;
     } catch (error) {
-      console.error("Comment upload error:", error);
+      console.error(
+        "Comment upload error:",
+        error
+      );
+
       return false;
     } finally {
       setIsLoading(false);

@@ -9,13 +9,33 @@ import {
 import { db } from "../services/firebase";
 import useChatAddUser from "./useChatAddUser";
 
-const useChatSendMessage = ({ user, currentUser }) => {
-  const { chatAddUser } = useChatAddUser();
-  const [loading, setLoading] = useState(false);
-  const [textMessage, setTextMessage] = useState("");
+const useChatSendMessage = ({
+  user,
+  currentUser,
+}) => {
+  const { chatAddUser } =
+    useChatAddUser();
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [textMessage, setTextMessage] =
+    useState("");
 
   const chatSendMessage = async () => {
-    if (loading) return;
+    const text = String(
+      textMessage || ""
+    ).trim();
+
+    if (
+      loading ||
+      !user?.email ||
+      !currentUser?.email ||
+      currentUser.email === user.email ||
+      !text
+    ) {
+      return false;
+    }
 
     setLoading(true);
 
@@ -24,33 +44,13 @@ const useChatSendMessage = ({ user, currentUser }) => {
         await chatAddUser(user);
       }
 
-      const notification = {
-        chat_notification: increment(1),
-      };
-
-      const current = {
-        email: currentUser.email,
-        name: currentUser.name,
-        profile_picture: currentUser.profile_picture,
-        username: currentUser.username,
-        status: "unseen",
-      };
-
-      const newCurrentMessage = {
-        message: textMessage,
-        timestamp: serverTimestamp(),
-        who: "current",
-      };
-
-      const newUserMessage = {
-        message: textMessage,
-        timestamp: serverTimestamp(),
-        who: "user",
-      };
-
       const batch = writeBatch(db);
 
-      const userRef = doc(db, "users", user.email);
+      const userRef = doc(
+        db,
+        "users",
+        user.email
+      );
 
       const currentChatRef = doc(
         db,
@@ -68,26 +68,77 @@ const useChatSendMessage = ({ user, currentUser }) => {
         currentUser.email
       );
 
-      const currentMessageId = doc(collection(currentChatRef, "messages")).id;
-      const newUserMessageId = doc(collection(newUserChatRef, "messages")).id;
-
-      batch.set(userRef, notification, { merge: true });
-      batch.set(newUserChatRef, current, { merge: true });
-      batch.set(
-        doc(currentChatRef, "messages", currentMessageId),
-        newCurrentMessage
+      const currentMessageRef = doc(
+        collection(
+          currentChatRef,
+          "messages"
+        )
       );
+
+      const newUserMessageRef = doc(
+        collection(
+          newUserChatRef,
+          "messages"
+        )
+      );
+
       batch.set(
-        doc(newUserChatRef, "messages", newUserMessageId),
-        newUserMessage
+        userRef,
+        {
+          chat_notification:
+            increment(1),
+        },
+        { merge: true }
+      );
+
+      batch.set(
+        newUserChatRef,
+        {
+          email: currentUser.email,
+          name: currentUser.name,
+          profile_picture:
+            currentUser.profile_picture,
+          username:
+            currentUser.username,
+          status: "unseen",
+        },
+        { merge: true }
+      );
+
+      batch.set(
+        currentMessageRef,
+        {
+          message: text,
+          timestamp:
+            serverTimestamp(),
+          who: "current",
+        }
+      );
+
+      batch.set(
+        newUserMessageRef,
+        {
+          message: text,
+          timestamp:
+            serverTimestamp(),
+          who: "user",
+        }
       );
 
       await batch.commit();
+
+      setTextMessage("");
+
+      return true;
     } catch (error) {
-      console.log("Error sending message: ", error);
+      console.error(
+        "Error sending message:",
+        error
+      );
+
+      return false;
     } finally {
       setLoading(false);
-      setTextMessage("");
     }
   };
 

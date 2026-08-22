@@ -8,57 +8,86 @@ import useUploadPicture from "./useUploadPicture";
 import { db } from "../services/firebase";
 
 const useUploadStory = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const { uploadPicture } = useUploadPicture();
+  const [isLoading, setIsLoading] =
+    useState(false);
 
-  const uploadStory = async (imageUrl, currentUser) => {
-    if (isLoading) return false;
+  const {
+    uploadPicture,
+  } = useUploadPicture();
 
-    if (!imageUrl || !currentUser?.email) {
-      console.error("Story upload: missing image or user information.");
+  const uploadStory = async (
+    imageUri,
+    currentUser
+  ) => {
+    if (
+      isLoading ||
+      !imageUri ||
+      !currentUser?.email
+    ) {
       return false;
     }
 
     setIsLoading(true);
 
     try {
-      const timestamp = Date.now();
-
-      const uploadedImageUrl = await uploadPicture(
-        imageUrl,
-        currentUser.email,
-        timestamp
-      );
+      const uploadedImageUrl =
+        await uploadPicture(
+          imageUri,
+          currentUser.email,
+          `story_${Date.now()}`
+        );
 
       if (!uploadedImageUrl) {
-        throw new Error("Story image upload failed.");
+        throw new Error(
+          "Cloudinary story upload failed."
+        );
       }
 
-      const newStory = {
-        imageUrl: uploadedImageUrl,
-        username: currentUser.username,
-        name: currentUser.name,
-        profile_picture: currentUser.profile_picture,
-        owner_uid: currentUser.owner_uid,
-        owner_email: currentUser.email,
-        createdAt: serverTimestamp(),
-        likes_by_users: [],
-        new_likes: [],
-        seen_by_users: [],
-      };
+      await addDoc(
+        collection(
+          db,
+          "users",
+          currentUser.email,
+          "stories"
+        ),
+        {
+          imageUrl:
+            uploadedImageUrl,
 
-      const storiesCollectionRef = collection(
-        db,
-        "users",
-        currentUser.email,
-        "stories"
+          username:
+            currentUser.username || "",
+
+          name:
+            currentUser.name || "",
+
+          profile_picture:
+            currentUser.profile_picture ||
+            "",
+
+          owner_uid:
+            currentUser.owner_uid || "",
+
+          owner_email:
+            currentUser.email,
+
+          createdAt:
+            serverTimestamp(),
+
+          likes_by_users: [],
+
+          new_likes: [],
+
+          seen_by_users: [],
+        }
       );
-
-      await addDoc(storiesCollectionRef, newStory);
 
       return true;
     } catch (error) {
-      console.error("Story upload failed:", error);
+      console.error(
+        "Story upload error:",
+        error
+      );
+
       return false;
     } finally {
       setIsLoading(false);

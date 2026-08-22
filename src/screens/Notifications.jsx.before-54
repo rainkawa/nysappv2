@@ -6,11 +6,7 @@ import {
   FlatList,
   Platform,
 } from "react-native";
-import {
-  MaterialIcons,
-  AntDesign,
-} from "@expo/vector-icons";
-import { useMemo } from "react";
+import { MaterialIcons, AntDesign } from "@expo/vector-icons";
 import Requests from "../components/follow/Requests";
 import Interaction from "../components/notifications/Interaction";
 import useFetchRequests from "../hooks/useFetchRequests";
@@ -19,12 +15,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { SIZES } from "../constants";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const Notifications = ({
-  navigation,
-  route,
-}) => {
-  const currentUser =
-    route?.params?.currentUser;
+const Notifications = ({ navigation, route }) => {
+  const currentUser = route?.params?.currentUser;
 
   const {
     notifications = [],
@@ -38,53 +30,16 @@ const Notifications = ({
     user: currentUser,
   });
 
-  const data = useMemo(() => {
-    const requestItems = requests.map(
-      (request, index) => ({
-        type: "request",
-        id:
-          request?.email ||
-          `request-${index}`,
-        request,
-      })
-    );
-
-    const notificationItems =
-      notifications
-        .filter(
-          (item) =>
-            item?.deleted !== true
-        )
-        .map((notification) => ({
-          type: "notification",
-          id: `notification-${notification.id}`,
-          notification,
-        }));
-
-    return [
-      ...requestItems,
-      ...notificationItems,
-    ];
-  }, [requests, notifications]);
-
   if (!currentUser) {
     return (
-      <SafeAreaView
-        style={styles.container}
-      >
-        <View
-          style={
-            styles.footerContainer
-          }
-        >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.footerContainer}>
           <Text style={styles.title}>
             User information unavailable
           </Text>
 
           <TouchableOpacity
-            onPress={() =>
-              navigation.goBack()
-            }
+            onPress={() => navigation.goBack()}
           >
             <Text style={styles.button}>
               Back
@@ -95,6 +50,14 @@ const Notifications = ({
     );
   }
 
+  const activeNotifications = notifications.filter(
+    (item) => item?.deleted !== true
+  );
+
+  const hasContent =
+    requests.length > 0 ||
+    activeNotifications.length > 0;
+
   return (
     <SafeAreaView
       style={styles.container}
@@ -103,11 +66,10 @@ const Notifications = ({
       <TouchableOpacity
         onPress={() => navigation.goBack()}
         style={styles.titleContainer}
-        activeOpacity={0.8}
       >
         <MaterialIcons
           name="arrow-back-ios"
-          size={21}
+          size={22}
           color="#fff"
         />
 
@@ -116,16 +78,26 @@ const Notifications = ({
         </Text>
       </TouchableOpacity>
 
-      {data.length > 0 ? (
+      {hasContent ? (
         <FlatList
-          data={data}
-          keyExtractor={(item) =>
-            item.id
-          }
+          data={[
+            ...requests.map((request, index) => ({
+              type: "request",
+              id: `request-${request?.email || index}`,
+              request,
+            })),
+
+            ...activeNotifications.map(
+              (notification) => ({
+                type: "notification",
+                id: `notification-${notification.id}`,
+                notification,
+              })
+            ),
+          ]}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => {
-            if (
-              item.type === "request"
-            ) {
+            if (item.type === "request") {
               return (
                 <Requests
                   user={item.request}
@@ -138,24 +110,18 @@ const Notifications = ({
             return (
               <Interaction
                 navigation={navigation}
-                notification={
-                  item.notification
-                }
+                notification={item.notification}
                 currentUser={currentUser}
               />
             );
           }}
-          contentContainerStyle={
-            styles.listContent
-          }
-          showsVerticalScrollIndicator={
-            false
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={
+            <View style={{ height: 40 }} />
           }
         />
       ) : (
-        <View
-          style={styles.footerContainer}
-        >
+        <View style={styles.footerContainer}>
           <LinearGradient
             start={[0.9, 0.45]}
             end={[0.07, 1.03]}
@@ -168,24 +134,21 @@ const Notifications = ({
           >
             <AntDesign
               name="checkcircle"
-              size={44}
+              size={58}
               color="#000"
             />
           </LinearGradient>
 
           <Text style={styles.title}>
-            No notifications
+            No notifications for now
           </Text>
 
           <Text style={styles.text}>
-            New follows, likes and comments
-            will appear here.
+            There are no notifications yet.
           </Text>
 
           <TouchableOpacity
-            onPress={() =>
-              navigation.goBack()
-            }
+            onPress={() => navigation.goBack()}
           >
             <Text style={styles.button}>
               Back to home
@@ -203,66 +166,60 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+    paddingTop: 0,
   },
 
   titleContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 18,
-    marginTop: 10,
+    marginHorizontal: 20,
+    marginTop: 14,
     marginBottom:
-      Platform.OS === "android"
-        ? 12
-        : 6,
-    gap: 2,
+      Platform.OS === "android" ? 20 : 4,
+    gap: 3,
   },
 
   textTitle: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "800",
-  },
-
-  listContent: {
-    paddingBottom: 35,
+    marginBottom: 4,
+    transform: [{ scaleY: 1.1 }],
   },
 
   footerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 24,
-    marginBottom: SIZES.Height * 0.12,
+    marginHorizontal: 20,
+    marginBottom: SIZES.Height * 0.18,
     gap: 10,
   },
 
   rainbowBorder: {
-    height: 50,
-    width: 50,
-    borderRadius: 25,
+    padding: 3,
+    height: 63.5,
+    width: 63.5,
     justifyContent: "center",
     alignItems: "center",
-    padding: 2,
+    borderRadius: 100,
   },
 
   title: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
-    textAlign: "center",
   },
 
   text: {
-    color: "#888",
-    fontSize: 13,
+    color: "#999",
+    fontSize: 14,
     textAlign: "center",
-    maxWidth: 280,
   },
 
   button: {
     color: "#09f",
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
-    marginTop: 3,
   },
 });

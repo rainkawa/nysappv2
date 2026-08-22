@@ -165,33 +165,6 @@ const EditProfile = ({ navigation }) => {
           <MaterialIcons name="keyboard-arrow-right" size={24} color="#999" />
         </TouchableOpacity>
         <Divider width={0.4} color={"#222"} />
-
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate("EditingProfile", {
-              module: "Privacy",
-            })
-          }
-          style={styles.rowContainer}
-        >
-          <Text style={styles.descriptiveText}>
-            Account privacy
-          </Text>
-
-          <Text style={styles.editableText}>
-            {currentUser?.isPrivate === true
-              ? "Private"
-              : "Public"}
-          </Text>
-
-          <MaterialIcons
-            name="keyboard-arrow-right"
-            size={22}
-            color="#777"
-          />
-        </TouchableOpacity>
-
-        <Divider width={0.4} color={"#222"} />
       </View>
       <ProfilePicture
         bottomSheetRef={bottomSheetRef}

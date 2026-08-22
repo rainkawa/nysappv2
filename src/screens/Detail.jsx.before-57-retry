@@ -27,46 +27,38 @@ const Detail = ({ navigation, route }) => {
   const { currentUser } = useUserContext();
 
   const {
-    posts: userPosts = [],
+    timeToReplaceData,
+    onSnapshotData,
   } = useFetchUserPosts(
     initialItem?.owner_email
   );
 
   const [bottomSheetIndex, setBottomSheetIndex] =
     useState(0);
-
   const [layoutHeight, setLayoutHeight] =
     useState(0);
 
-  const bottomSheetRefOptions =
-    useRef(null);
-
-  const bottomSheetRefComments =
-    useRef(null);
-
-  const bottomSheetRefComment =
-    useRef(null);
+  const bottomSheetRefOptions = useRef(null);
+  const bottomSheetRefComments = useRef(null);
+  const bottomSheetRefComment = useRef(null);
 
   const [posts, setPosts] = useState(
     initialItem ? [initialItem] : []
   );
 
   useEffect(() => {
-    if (!initialItem?.id) {
-      return;
-    }
-
     if (
-      !Array.isArray(userPosts) ||
-      userPosts.length === 0
+      !initialItem?.id ||
+      !Array.isArray(onSnapshotData) ||
+      timeToReplaceData <= 0
     ) {
-      setPosts([initialItem]);
       return;
     }
 
-    const index = userPosts.findIndex(
-      (post) =>
-        post?.id === initialItem.id
+    const snapshotPosts = [...onSnapshotData];
+
+    const index = snapshotPosts.findIndex(
+      (post) => post?.id === initialItem.id
     );
 
     if (index === -1) {
@@ -74,38 +66,30 @@ const Detail = ({ navigation, route }) => {
       return;
     }
 
-    const orderedPosts = [
-      ...userPosts,
-    ];
-
-    const selectedPost =
-      orderedPosts.splice(index, 1)[0];
+    const [selectedPost] =
+      snapshotPosts.splice(index, 1);
 
     setPosts([
       selectedPost,
-      ...orderedPosts,
+      ...snapshotPosts,
     ]);
 
     setBottomSheetIndex(0);
-  }, [initialItem?.id, userPosts]);
+  }, [
+    initialItem,
+    onSnapshotData,
+    timeToReplaceData,
+  ]);
 
-  const translateX =
-    useSharedValue(0);
-
-  const translateY =
-    useSharedValue(0);
-
-  const opacity =
-    useSharedValue(1);
-
-  const scale =
-    useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const opacity = useSharedValue(1);
+  const scale = useSharedValue(1);
 
   const gesture = Gesture.Pan()
     .onUpdate((event) => {
       translateX.value =
         event.translationX * 0.8;
-
       translateY.value =
         event.translationY * 0.8;
 
@@ -116,13 +100,15 @@ const Detail = ({ navigation, route }) => {
             event.translationY
       );
 
-      scale.value = Math.max(
+      const scaleValue = Math.max(
         0.9,
         Math.min(
           1,
           1 - distance / 1000
         )
       );
+
+      scale.value = scaleValue;
     })
     .onEnd(() => {
       if (translateY.value > 75) {
@@ -130,53 +116,45 @@ const Detail = ({ navigation, route }) => {
           0,
           { duration: 120 },
           () => {
-            runOnJS(
-              navigation.goBack
-            )();
+            runOnJS(navigation.goBack)();
           }
         );
 
         return;
       }
 
-      translateX.value =
-        withTiming(0, {
-          duration: 300,
-        });
+      translateX.value = withTiming(0, {
+        duration: 300,
+      });
 
-      translateY.value =
-        withTiming(0, {
-          duration: 300,
-        });
+      translateY.value = withTiming(0, {
+        duration: 300,
+      });
 
-      scale.value =
-        withTiming(1, {
-          duration: 300,
-        });
+      scale.value = withTiming(1, {
+        duration: 300,
+      });
     });
 
   const animatedStyle =
     useAnimatedStyle(() => ({
       transform: [
         {
-          translateX:
-            translateX.value,
+          translateX: translateX.value,
         },
         {
-          translateY:
-            translateY.value,
+          translateY: translateY.value,
         },
         {
           scale: scale.value,
         },
       ],
 
-      backgroundColor:
-        interpolateColor(
-          opacity.value,
-          [0, 1],
-          ["transparent", "#000"]
-        ),
+      backgroundColor: interpolateColor(
+        opacity.value,
+        [0, 1],
+        ["transparent", "#000"]
+      ),
 
       borderRadius: 20,
       overflow: "hidden",
@@ -195,9 +173,7 @@ const Detail = ({ navigation, route }) => {
   }
 
   return (
-    <GestureDetector
-      gesture={gesture}
-    >
+    <GestureDetector gesture={gesture}>
       <Animated.View
         style={[
           styles.container,
@@ -214,15 +190,12 @@ const Detail = ({ navigation, route }) => {
           data={posts}
           snapToInterval={
             layoutHeight > 0
-              ? layoutHeight
+              ? layoutHeight - 10
               : undefined
           }
           snapToAlignment="start"
           decelerationRate="fast"
-          renderItem={({
-            item,
-            index,
-          }) => (
+          renderItem={({ item, index }) => (
             <RenderItem
               navigation={navigation}
               post={item}
@@ -245,23 +218,14 @@ const Detail = ({ navigation, route }) => {
               }
             />
           )}
-          keyExtractor={(
-            item,
-            index
-          ) =>
+          ListFooterComponent={
+            <View style={{ height: 100 }} />
+          }
+          keyExtractor={(item, index) =>
             item?.id?.toString() ||
             index.toString()
           }
-          ListFooterComponent={
-            <View
-              style={{
-                height: 60,
-              }}
-            />
-          }
-          showsVerticalScrollIndicator={
-            false
-          }
+          showsVerticalScrollIndicator={false}
         />
 
         <View

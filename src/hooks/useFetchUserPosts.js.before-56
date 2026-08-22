@@ -1,7 +1,4 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 import {
   collection,
   doc,
@@ -12,47 +9,32 @@ import {
 } from "firebase/firestore";
 import { db } from "../services/firebase";
 
-const normalizePost = (
-  post
-) => {
-  const data =
-    post.data() || {};
+const normalizePost = (post) => {
+  const data = post.data() || {};
 
   return {
     id: post.id,
     ...data,
-
-    comments:
-      Array.isArray(
-        data.comments
-      )
-        ? data.comments
-        : [],
-
-    new_likes:
-      Array.isArray(
-        data.new_likes
-      )
-        ? data.new_likes
-        : [],
+    comments: Array.isArray(data.comments)
+      ? data.comments
+      : [],
+    new_likes: Array.isArray(data.new_likes)
+      ? data.new_likes
+      : [],
   };
 };
 
-const useFetchUserPosts = (
-  email
-) => {
-  const [posts, setPosts] =
-    useState([]);
-
-  const [loadLimit, setLoadLimit] =
-    useState(20);
-
-  const [loader, setLoader] =
-    useState(false);
+const useFetchUserPosts = (email) => {
+  const [posts, setPosts] = useState([]);
+  const [loadLimit, setLoadLimit] = useState(20);
+  const [loader, setLoader] = useState(false);
+  const [onSnapshotData, setOnSnapshotData] = useState([]);
+  const [timeToReplaceData, setTimeToReplaceData] = useState(0);
 
   useEffect(() => {
     if (!email) {
       setPosts([]);
+      setOnSnapshotData([]);
       setLoader(false);
       return undefined;
     }
@@ -66,22 +48,20 @@ const useFetchUserPosts = (
 
     const postsQuery = query(
       postsRef,
-      orderBy(
-        "createdAt",
-        "desc"
-      ),
+      orderBy("createdAt", "desc"),
       limit(loadLimit)
     );
 
     const unsubscribe = onSnapshot(
       postsQuery,
       (snapshot) => {
-        const nextPosts =
-          snapshot.docs.map(
-            normalizePost
-          );
+        const data = snapshot.docs.map(normalizePost);
 
-        setPosts(nextPosts);
+        setOnSnapshotData(data);
+        setPosts(data);
+        setTimeToReplaceData(
+          (previous) => previous + 1
+        );
         setLoader(false);
       },
       (error) => {
@@ -91,20 +71,17 @@ const useFetchUserPosts = (
         );
 
         setPosts([]);
+        setOnSnapshotData([]);
         setLoader(false);
       }
     );
 
     return unsubscribe;
-  }, [
-    email,
-    loadLimit,
-  ]);
+  }, [email, loadLimit]);
 
   const fetchOlderPosts = () => {
     setLoadLimit(
-      (previous) =>
-        previous + 10
+      (previous) => previous + 10
     );
   };
 
@@ -117,6 +94,8 @@ const useFetchUserPosts = (
     loader,
     fetchOlderPosts,
     refreshPosts,
+    onSnapshotData,
+    timeToReplaceData,
   };
 };
 
