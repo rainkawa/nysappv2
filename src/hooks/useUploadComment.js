@@ -26,7 +26,7 @@ const useUploadComment = (post, currentUser) => {
             username: currentUser.username,
             comment: value,
             createdAt: Timestamp.now(),
-            likes_by_users: "",
+            likes_by_users: [],
           };
 
           await updateDoc(postRef, {

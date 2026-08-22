@@ -1,44 +1,58 @@
 import { useState } from "react";
-import {
-  getStorage,
-  ref,
-  uploadBytesResumable,
-  getDownloadURL,
-} from "firebase/storage";
+
+const CLOUDINARY_CLOUD_NAME = "sqqodjug";
+const CLOUDINARY_UPLOAD_PRESET = "instagram_clon";
 
 const useUploadPicture = () => {
   const [uploading, setUploading] = useState(false);
-  const storage = getStorage();
 
   const uploadPicture = async (uri, email, name) => {
-    if (uploading) return;
+    if (uploading || !uri) return null;
+
     setUploading(true);
+
     try {
-      const storageRef = ref(storage, `${email}/${name}`);
+      const formData = new FormData();
 
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      const fileName = name
+        ? `${name}.jpg`
+        : `upload_${Date.now()}.jpg`;
 
-      const uploadTask = uploadBytesResumable(storageRef, blob);
-
-      await new Promise((resolve, reject) => {
-        uploadTask.on(
-          "state_changed",
-          (snapshot) => {
-            const progress = Math.round(
-              (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-            );
-            console.log("Upload is " + progress + "% done");
-          },
-          (error) => reject(error),
-          () => resolve()
-        );
+      formData.append("file", {
+        uri,
+        type: "image/jpeg",
+        name: fileName,
       });
 
-      const downloadUrl = await getDownloadURL(storageRef);
-      return downloadUrl;
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+      // Kullanıcı klasörü
+      formData.append("folder", `instagram/${email}`);
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Cloudinary upload error:", data);
+        throw new Error(
+          data?.error?.message || "Cloudinary upload failed"
+        );
+      }
+
+      console.log("☁️ Cloudinary upload successful");
+      console.log("🔗 URL:", data.secure_url);
+
+      return data.secure_url;
     } catch (error) {
-      console.error(error);
+      console.error("❌ Upload failed:", error);
+      return null;
     } finally {
       setUploading(false);
     }

@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
+
 import { useState } from "react";
 import { useUserContext } from "../contexts/UserContext";
 import useResizePictures from "../hooks/useResizePictures";
@@ -25,107 +26,197 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const NewPost = ({ navigation, route }) => {
   const { selectedImage } = route.params || {};
   const { currentUser } = useUserContext();
+
   const { resizePostPicture } = useResizePictures();
   const { uploadPost, loader } = useUploadPost();
+
   const [caption, setCaption] = useState("");
   const [focusedBar, setFocusedBar] = useState(false);
   const [messageModalVisible, setMessageModalVisible] = useState(false);
 
+  // Hem eski string yapısını hem yeni {uri: "..."} yapısını destekle
+  const imageUri =
+    typeof selectedImage === "string"
+      ? selectedImage
+      : selectedImage?.uri || null;
+
   const handleFocus = () => {
     setFocusedBar(true);
   };
+
   const handleBlur = () => {
     Keyboard.dismiss();
     setFocusedBar(false);
   };
 
   const handleNextButton = async () => {
-    const resizedImage = await resizePostPicture(selectedImage);
-    await uploadPost(resizedImage, caption, currentUser);
-    navigation.navigate("Main Screen");
+    if (loader) return;
+
+    if (!imageUri) {
+      console.error("❌ NewPost: image URI bulunamadı", selectedImage);
+      return;
+    }
+
+    try {
+      console.log("📸 NewPost image URI:", imageUri);
+
+      // Resmi küçült
+      const resizedImage = await resizePostPicture(imageUri);
+
+      console.log("✅ Image resized:", resizedImage?.uri);
+
+      if (!resizedImage?.uri) {
+        throw new Error("Resized image URI missing");
+      }
+
+      // Cloudinary + Firebase
+      await uploadPost(
+        resizedImage,
+        caption,
+        currentUser
+      );
+
+      console.log("✅ NewPost paylaşım tamamlandı");
+
+      navigation.navigate("Main Screen");
+    } catch (error) {
+      console.error("❌ NewPost paylaşım hatası:", error);
+    }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView
+      style={styles.container}
+      edges={["top", "bottom"]}
+    >
       <View style={styles.headerContainer}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back-ios" size={23} color={"#fff"} />
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons
+            name="arrow-back-ios"
+            size={23}
+            color="#fff"
+          />
         </TouchableOpacity>
-        <Text style={styles.headerText}>New Post</Text>
+
+        <Text style={styles.headerText}>
+          New Post
+        </Text>
 
         <TouchableOpacity
-          onPress={() => (focusedBar ? handleBlur() : handleNextButton())}
+          onPress={() =>
+            focusedBar
+              ? handleBlur()
+              : handleNextButton()
+          }
+          disabled={loader}
         >
           <Text style={styles.nextButton}>
-            {loader ? <ActivityIndicator /> : focusedBar ? "OK" : "Share"}
+            {loader ? (
+              <ActivityIndicator color="#08f" />
+            ) : focusedBar ? (
+              "OK"
+            ) : (
+              "Share"
+            )}
           </Text>
         </TouchableOpacity>
       </View>
-      <TouchableWithoutFeedback onPress={() => handleBlur()}>
+
+      <TouchableWithoutFeedback
+        onPress={() => handleBlur()}
+      >
         <View>
           <View style={styles.inputContainer}>
-            <Image
-              source={{
-                uri: selectedImage,
-              }}
-              style={styles.image}
-            />
+            {imageUri ? (
+              <Image
+                source={{ uri: imageUri }}
+                style={styles.image}
+              />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Text style={styles.placeholderText}>
+                  No image
+                </Text>
+              </View>
+            )}
+
             <View style={styles.captionContainer}>
               <TextInput
                 value={caption}
-                onChangeText={(caption) => setCaption(caption)}
+                onChangeText={setCaption}
                 placeholder="Write a caption..."
-                placeholderTextColor={"#999"}
+                placeholderTextColor="#999"
                 style={styles.captionText}
-                multiline={true}
-                onFocus={() => handleFocus()}
-                onBlur={() => handleBlur()}
+                multiline
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 maxLength={2200}
-                autoCorrect={true}
-                autoFocus={true}
+                autoCorrect
+                autoFocus
                 textAlignVertical="center"
               />
             </View>
           </View>
+
           <View style={styles.secondContainer}>
-            <Divider width={0.4} color="#333" />
+            <Divider
+              width={0.4}
+              color="#333"
+            />
 
             <TouchableOpacity
               onPress={() =>
-                handleFeatureNotImplemented(setMessageModalVisible)
+                handleFeatureNotImplemented(
+                  setMessageModalVisible
+                )
               }
               style={styles.optionsContainer}
             >
-              <Text style={styles.optionText}>Tag people</Text>
+              <Text style={styles.optionText}>
+                Tag people
+              </Text>
+
               <MaterialIcons
                 name="keyboard-arrow-right"
                 size={26}
-                color={"#999"}
+                color="#999"
                 style={styles.optionIcon}
               />
             </TouchableOpacity>
 
-            <Divider width={0.3} color="#333" />
+            <Divider
+              width={0.3}
+              color="#333"
+            />
+
             <TouchableOpacity
               onPress={() =>
-                handleFeatureNotImplemented(setMessageModalVisible)
+                handleFeatureNotImplemented(
+                  setMessageModalVisible
+                )
               }
               style={styles.optionsContainer}
             >
-              <Text style={styles.optionText}>Advanced settings</Text>
+              <Text style={styles.optionText}>
+                Advanced settings
+              </Text>
+
               <MaterialIcons
                 name="keyboard-arrow-right"
                 size={26}
-                color={"#999"}
+                color="#999"
                 style={styles.optionIcon}
               />
             </TouchableOpacity>
           </View>
         </View>
       </TouchableWithoutFeedback>
+
       <MessageModal
         messageModalVisible={messageModalVisible}
-        message={"This feature is not yet implemented."}
+        message="This feature is not yet implemented."
       />
     </SafeAreaView>
   );
@@ -139,6 +230,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000",
     paddingTop: 0,
   },
+
   headerContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -146,39 +238,51 @@ const styles = StyleSheet.create({
     marginHorizontal: 15,
     height: 40,
   },
-  iconCorrection: {
-    marginLeft: -10,
-  },
+
   headerText: {
     color: "#fff",
     fontWeight: "800",
     fontSize: 16,
   },
+
   nextButton: {
     color: "#08f",
     fontWeight: "800",
     fontSize: 16,
   },
-  nullButton: {
-    color: "#000",
-    fontWeight: "700",
-    fontSize: 20,
-  },
+
   inputContainer: {
     flexDirection: "row",
     marginTop: Platform.OS === "android" ? 15 : 12,
     marginHorizontal: 15,
     marginBottom: 14,
   },
+
   image: {
     height: SIZES.Width * 0.2,
     width: SIZES.Width * 0.2,
     borderRadius: 4,
   },
+
+  imagePlaceholder: {
+    height: SIZES.Width * 0.2,
+    width: SIZES.Width * 0.2,
+    borderRadius: 4,
+    backgroundColor: "#222",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  placeholderText: {
+    color: "#777",
+    fontSize: 11,
+  },
+
   captionContainer: {
     flex: 1,
     justifyContent: "center",
   },
+
   captionText: {
     color: "#fff",
     fontSize: 16,
@@ -186,9 +290,11 @@ const styles = StyleSheet.create({
     width: SIZES.Width * 0.66,
     marginBottom: 8,
   },
+
   secondContainer: {
     minHeight: 500,
   },
+
   optionsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -196,8 +302,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginVertical: 12,
   },
+
   optionText: {
     color: "#fff",
     fontSize: 16,
+  },
+
+  optionIcon: {
+    marginLeft: 10,
   },
 });

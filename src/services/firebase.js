@@ -1,15 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { initializeApp } from "firebase/app";
-import { initializeAuth, getReactNativePersistence } from "firebase/auth";
+import {
+  initializeAuth,
+  getReactNativePersistence,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC61M-mcCdlkudNOvqtpMNO6XU28Ds3Tng",
-  authDomain: "instagram-clone-app-3f538.firebaseapp.com",
-  projectId: "instagram-clone-app-3f538",
-  storageBucket: "instagram-clone-app-3f538.appspot.com",
-  messagingSenderId: "923663435657",
-  appId: "1:923663435657:web:55648541fad8fbcfd30358",
+  apiKey: "AIzaSyA1S6QouNmYLjml_uCcFVoDDCaX8iluZH0",
+  authDomain: "nysapp-e1144.firebaseapp.com",
+  projectId: "nysapp-e1144",
+  storageBucket: "nysapp-e1144.firebasestorage.app",
+  messagingSenderId: "112874487499",
+  appId: "1:112874487499:web:f5f568db178b81e415a54e",
 };
 
 const app = initializeApp(firebaseConfig);

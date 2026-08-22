@@ -12,9 +12,22 @@ import { LinearGradient } from "expo-linear-gradient";
 const Interaction = ({ navigation, item, currentUser, text }) => {
   const { checkStoriesSeen } = useCheckStoriesSeen();
 
+  const comments = Array.isArray(item?.comments)
+    ? item.comments
+    : [];
+
+  const newLikes = Array.isArray(item?.new_likes)
+    ? item.new_likes
+    : [];
+
+  const lastComment =
+    comments.length > 0
+      ? comments[comments.length - 1]
+      : null;
+
   const handleUserProfile = () => {
     navigation.navigate("UserDetail", {
-      email: item.comments[item.comments.length - 1].email,
+      email: lastComment?.email,
     });
   };
 
@@ -27,7 +40,8 @@ const Interaction = ({ navigation, item, currentUser, text }) => {
       <View style={styles.rowContainer}>
         <TouchableOpacity onPress={() => handleUserProfile()}>
           {text === "commented" &&
-          checkStoriesSeen(item.username, currentUser.email) ? (
+          lastComment?.email &&
+          checkStoriesSeen(lastComment.email, currentUser.email) ? (
             <LinearGradient
               start={[0.9, 0.45]}
               end={[0.07, 1.03]}
@@ -38,8 +52,8 @@ const Interaction = ({ navigation, item, currentUser, text }) => {
                 source={{
                   uri:
                     text === "commented"
-                      ? item.comments[item.comments.length - 1].profile_picture
-                      : item.new_likes[1],
+                      ? lastComment?.profile_picture || ""
+                      : newLikes[1] || "",
                 }}
                 style={styles.image}
               />
@@ -49,8 +63,8 @@ const Interaction = ({ navigation, item, currentUser, text }) => {
               source={{
                 uri:
                   text === "commented"
-                    ? item.comments[item.comments.length - 1].profile_picture
-                    : item.new_likes[1],
+                    ? lastComment?.profile_picture || ""
+                    : newLikes[1] || "",
               }}
               style={styles.nonRainbowImage}
             />
@@ -60,8 +74,8 @@ const Interaction = ({ navigation, item, currentUser, text }) => {
           <TouchableOpacity onPress={() => handleUserProfile()}>
             <Text style={styles.username}>
               {text === "commented"
-                ? item.comments[item.comments.length - 1].username
-                : item.new_likes[0]}
+                ? lastComment?.username || "Someone"
+                : newLikes[0] || "Someone"}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => handleCheckPost()}>

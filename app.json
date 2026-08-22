@@ -27,7 +27,12 @@
       "permissions": [
         "CAMERA",
         "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO"
+        "READ_MEDIA_VIDEO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "package": "com.hernanhawryluk.instagramcloneapp"
     },
@@ -36,7 +41,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "55ef79b5-c036-4cca-87a6-bca70d51f185"
+        "projectId": "3fd681e8-9a2c-4ffa-879c-a7acb8ba85f6"
       }
     },
     "plugins": [
@@ -67,7 +72,9 @@
           "recordAudioAndroid": true
         }
       ],
-      "expo-asset"
-    ]
+      "expo-asset",
+      "expo-font"
+    ],
+    "owner": "rainkawa"
   }
 }

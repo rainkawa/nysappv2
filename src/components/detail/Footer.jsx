@@ -57,7 +57,7 @@ const Footer = ({
               />
             )}
           </TouchableOpacity>
-          {post?.likes_by_users?.length > 1 && (
+          {post?.likes_by_users?.length > 0 && (
             <TouchableOpacity onPress={handleViewLikes}>
               <Text style={styles.quantyText}>
                 {post?.likes_by_users?.length}
@@ -74,7 +74,7 @@ const Footer = ({
               style={styles.chatIcon}
             />
           </TouchableOpacity>
-          {post?.comments?.length > 1 && (
+          {post?.comments?.length > 0 && (
             <TouchableOpacity onPress={handleCommentsSection}>
               <Text style={styles.quantyText}>{post?.comments?.length}</Text>
             </TouchableOpacity>
