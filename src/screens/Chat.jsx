@@ -8,13 +8,20 @@ import {
   TextInput,
   Keyboard,
   Animated,
+  KeyboardAvoidingView,
 } from "react-native";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Ionicons,
   MaterialIcons,
 } from "@expo/vector-icons";
-import { useUserContext } from "../contexts/UserContext";
+import {
+  useUserContext,
+} from "../contexts/UserContext";
 import RenderUser from "../components/chat/RenderUser";
 import useFindUsers from "../hooks/useFindUsers";
 import { SIZES } from "../constants";
@@ -28,11 +35,21 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../services/firebase";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+} from "react-native-safe-area-context";
 
-const Chat = ({ navigation }) => {
-  const [searchKey, setSearchKey] = useState("");
-  const { currentUser } = useUserContext();
+const Chat = ({
+  navigation,
+}) => {
+  const [
+    searchKey,
+    setSearchKey,
+  ] = useState("");
+
+  const {
+    currentUser,
+  } = useUserContext();
 
   const {
     chatUsers = [],
@@ -54,87 +71,102 @@ const Chat = ({ navigation }) => {
     SIZES.Width * 0.9
   );
 
-  const [inputWidth, setInputWidth] =
-    useState(SIZES.Width * 0.8);
+  const [
+    inputWidth,
+    setInputWidth,
+  ] = useState(
+    SIZES.Width * 0.8
+  );
 
-  const [focusedBar, setFocusedBar] =
-    useState(false);
+  const [
+    focusedBar,
+    setFocusedBar,
+  ] = useState(false);
 
-  const [searching, setSearching] =
-    useState(false);
+  const [
+    searching,
+    setSearching,
+  ] = useState(false);
 
-  const [messageModalVisible, setMessageModalVisible] =
-    useState(false);
+  const [
+    messageModalVisible,
+    setMessageModalVisible,
+  ] = useState(false);
 
   useEffect(() => {
-    const resetChatNotification = async () => {
-      if (
-        !currentUser?.email ||
-        !(currentUser?.chat_notification > 0)
-      ) {
-        return;
-      }
+    const resetChatNotification =
+      async () => {
+        if (
+          !currentUser?.email ||
+          !(
+            currentUser?.chat_notification >
+            0
+          )
+        ) {
+          return;
+        }
 
-      try {
-        await updateDoc(
-          doc(db, "users", currentUser.email),
-          {
-            chat_notification: 0,
-          }
-        );
-      } catch (error) {
-        console.log(
-          "Chat notification reset error:",
-          error
-        );
-      }
-    };
+        try {
+          await updateDoc(
+            doc(
+              db,
+              "users",
+              currentUser.email
+            ),
+            {
+              chat_notification: 0,
+            }
+          );
+        } catch (error) {
+          console.error(
+            "Chat notification reset error:",
+            error
+          );
+        }
+      };
 
     resetChatNotification();
-  }, [currentUser?.email]);
+  }, [
+    currentUser?.email,
+  ]);
 
-  const myUser = useMemo(() => {
-    if (!currentUser?.email) {
-      return null;
-    }
+  const messageUsers =
+    useMemo(() => {
+      const seen = new Set();
 
-    return {
-      id:
-        currentUser?.uid ||
-        currentUser?.email,
-      ...currentUser,
-    };
-  }, [currentUser]);
+      return chatUsers.filter(
+        (user) => {
+          if (
+            !user?.email ||
+            user.email ===
+              currentUser?.email
+          ) {
+            return false;
+          }
 
-  const messageUsers = useMemo(() => {
-    const result = [];
+          if (
+            seen.has(user.email)
+          ) {
+            return false;
+          }
 
-    if (myUser) {
-      result.push(myUser);
-    }
+          seen.add(
+            user.email
+          );
 
-    const seen = new Set(
-      myUser?.email
-        ? [myUser.email]
-        : []
-    );
-
-    for (const user of chatUsers) {
-      if (!user?.email || seen.has(user.email)) {
-        continue;
-      }
-
-      seen.add(user.email);
-      result.push(user);
-    }
-
-    return result;
-  }, [chatUsers, myUser]);
+          return true;
+        }
+      );
+    }, [
+      chatUsers,
+      currentUser?.email,
+    ]);
 
   const handleFocus = () => {
     forceSlideAnimation(true);
     setFocusedBar(true);
     setSearching(true);
+
     setInputWidth(
       SIZES.Width * 0.7
     );
@@ -142,10 +174,14 @@ const Chat = ({ navigation }) => {
 
   const handleCancel = () => {
     forceSlideAnimation(false);
+
     setFocusedBar(false);
     setSearching(false);
+
     setSearchKey("");
+
     Keyboard.dismiss();
+
     setInputWidth(
       SIZES.Width * 0.8
     );
@@ -159,116 +195,202 @@ const Chat = ({ navigation }) => {
 
   const data = searching
     ? searchKey.trim().length > 0
-      ? searchResult
-      : users
+      ? searchResult.filter(
+          (user) =>
+            user?.email !==
+            currentUser?.email
+        )
+      : []
     : messageUsers;
 
   return (
     <SafeAreaView
       style={styles.container}
-      edges={["top", "bottom"]}
+      edges={[
+        "top",
+        "bottom",
+      ]}
     >
-      <View style={styles.titleContainer}>
-        <TouchableOpacity
-          onPress={() =>
-            navigation.goBack()
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={
+          Platform.OS === "ios"
+            ? "padding"
+            : "height"
+        }
+        keyboardVerticalOffset={
+          Platform.OS === "ios"
+            ? 8
+            : 0
+        }
+      >
+        <View
+          style={
+            styles.titleContainer
           }
-          style={styles.rowContainer}
         >
-          <MaterialIcons
-            name="arrow-back-ios"
-            size={24}
-            color="#fff"
-          />
-
-          <Text style={styles.textTitle}>
-            {currentUser?.username ||
-              "Messages"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.searchBar}>
-        <Animated.View
-          style={[
-            styles.searchWrapper,
-            {
-              width: slideAnimation,
-            },
-          ]}
-        >
-          <Ionicons
-            name="search"
-            size={19}
-            color="#999"
-            style={styles.searchIcon}
-          />
-
-          <TextInput
-            value={searchKey}
-            onChangeText={setSearchKey}
-            maxLength={30}
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder="Search"
-            placeholderTextColor="#999"
-            style={[
-              styles.searchInput,
-              {
-                width: inputWidth,
-              },
-            ]}
-            enterKeyHint="search"
-            onFocus={handleFocus}
-          />
-        </Animated.View>
-
-        {focusedBar && (
           <TouchableOpacity
-            onPress={handleCancel}
+            onPress={() =>
+              navigation.goBack()
+            }
+            style={
+              styles.rowContainer
+            }
           >
-            <Text style={styles.cancelBtn}>
-              Cancel
+            <MaterialIcons
+              name="arrow-back-ios"
+              size={21}
+              color="#fff"
+            />
+
+            <Text
+              style={styles.textTitle}
+            >
+              {currentUser?.username ||
+                "Messages"}
             </Text>
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
 
-      <View style={styles.result}>
-        <Text style={styles.subtitle}>
-          {searching
-            ? searchKey.trim().length > 0
-              ? "Search result:"
-              : "Suggested"
-            : "Messages"}
-        </Text>
-
-        <FlatList
-          data={data}
-          keyExtractor={(item, index) =>
-            item?.email ||
-            item?.id?.toString() ||
-            index.toString()
-          }
-          renderItem={({ item }) => (
-            <RenderUser
-              navigation={navigation}
-              user={item}
-              currentUser={currentUser}
-              handleCamera={
-                searching
-                  ? undefined
-                  : handleCamera
+        <View
+          style={styles.searchBar}
+        >
+          <Animated.View
+            style={[
+              styles.searchWrapper,
+              {
+                width:
+                  slideAnimation,
+              },
+            ]}
+          >
+            <Ionicons
+              name="search"
+              size={18}
+              color="#999"
+              style={
+                styles.searchIcon
               }
             />
+
+            <TextInput
+              value={searchKey}
+              onChangeText={
+                setSearchKey
+              }
+              maxLength={30}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Search"
+              placeholderTextColor="#999"
+              style={[
+                styles.searchInput,
+                {
+                  width:
+                    inputWidth,
+                },
+              ]}
+              enterKeyHint="search"
+              onFocus={
+                handleFocus
+              }
+            />
+          </Animated.View>
+
+          {focusedBar && (
+            <TouchableOpacity
+              onPress={
+                handleCancel
+              }
+            >
+              <Text
+                style={
+                  styles.cancelBtn
+                }
+              >
+                Cancel
+              </Text>
+            </TouchableOpacity>
           )}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={7}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        />
-      </View>
+        </View>
+
+        <View style={styles.result}>
+          <Text
+            style={styles.subtitle}
+          >
+            {searching
+              ? searchKey.trim()
+                  .length > 0
+                ? "Search result:"
+                : "Search for someone"
+              : "Messages"}
+          </Text>
+
+          <FlatList
+            data={data}
+            keyExtractor={(
+              item,
+              index
+            ) =>
+              item?.email ||
+              item?.id?.toString() ||
+              index.toString()
+            }
+            renderItem={({
+              item,
+            }) => (
+              <RenderUser
+                navigation={
+                  navigation
+                }
+                user={item}
+                currentUser={
+                  currentUser
+                }
+                handleCamera={
+                  searching
+                    ? undefined
+                    : handleCamera
+                }
+              />
+            )}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={7}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={
+              false
+            }
+            ListEmptyComponent={
+              <View
+                style={
+                  styles.emptyContainer
+                }
+              >
+                <Text
+                  style={
+                    styles.emptyTitle
+                  }
+                >
+                  {searching
+                    ? "No users found"
+                    : "No conversations yet"}
+                </Text>
+
+                <Text
+                  style={
+                    styles.emptyText
+                  }
+                >
+                  {searching
+                    ? "Try another username."
+                    : "Use Search to find someone and start a chat."}
+                </Text>
+              </View>
+            }
+          />
+        </View>
+      </KeyboardAvoidingView>
 
       <MessageModal
         messageModalVisible={
@@ -290,6 +412,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
 
+  keyboardContainer: {
+    flex: 1,
+  },
+
   rowContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -298,7 +424,8 @@ const styles = StyleSheet.create({
 
   titleContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     marginHorizontal: 18,
     marginTop:
       Platform.OS === "android"
@@ -308,17 +435,17 @@ const styles = StyleSheet.create({
 
   textTitle: {
     color: "#fff",
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
     marginBottom:
       Platform.OS === "android"
-        ? 5
+        ? 4
         : 1,
   },
 
   subtitle: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     marginTop: 12,
     marginBottom: 4,
@@ -333,7 +460,8 @@ const styles = StyleSheet.create({
 
   searchWrapper: {
     marginTop: 9,
-    marginLeft: SIZES.Width * 0.04,
+    marginLeft:
+      SIZES.Width * 0.04,
     backgroundColor: "#252525",
     height:
       Platform.OS === "android"
@@ -359,11 +487,31 @@ const styles = StyleSheet.create({
   cancelBtn: {
     color: "#fff",
     fontWeight: "500",
-    fontSize: 15,
+    fontSize: 14,
     marginLeft: 12,
   },
 
   result: {
     flex: 1,
+  },
+
+  emptyContainer: {
+    alignItems: "center",
+    paddingHorizontal: 30,
+    paddingTop: 55,
+  },
+
+  emptyTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  emptyText: {
+    color: "#777",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 7,
+    lineHeight: 19,
   },
 });

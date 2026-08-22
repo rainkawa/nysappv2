@@ -1,48 +1,82 @@
-import { StyleSheet, TouchableOpacity, View, Platform } from "react-native";
-import { Image } from "expo-image";
-import Animated from "react-native-reanimated";
-import { SIZES } from "../../constants";
+import {
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import {
+  Image,
+} from "expo-image";
+import { useRef } from "react";
 
-const RenderItem = ({ navigation, item }) => {
+const RenderItem = ({
+  item,
+  navigation,
+}) => {
+  const opening =
+    useRef(false);
+
+  const openDetail = () => {
+    if (
+      opening.current ||
+      !item?.id
+    ) {
+      return;
+    }
+
+    opening.current = true;
+
+    navigation.navigate(
+      "Detail",
+      {
+        item,
+      }
+    );
+
+    setTimeout(() => {
+      opening.current = false;
+    }, 450);
+  };
+
   return (
-    <View>
-      {item.imageUrl && (
-        <TouchableOpacity
-          onPress={() => navigation.navigate("Detail", { item: item })}
-          style={styles.imagesContainer}
-          key={item.id}
-        >
-          {Platform.OS === "ios" && (
-            <Animated.Image
-              style={styles.images}
-              source={{ uri: item.imageUrl }}
-            />
-          )}
-          <Image source={{ uri: item.imageUrl }} style={styles.Images} />
-        </TouchableOpacity>
-      )}
-    </View>
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={openDetail}
+      style={styles.container}
+    >
+      <Image
+        source={{
+          uri:
+            item?.imageUrl ||
+            "",
+        }}
+        style={styles.image}
+        contentFit="cover"
+      />
+
+      <View
+        pointerEvents="none"
+        style={styles.overlay}
+      />
+    </TouchableOpacity>
   );
 };
 
 export default RenderItem;
 
 const styles = StyleSheet.create({
-  imagesContainer: {
-    width: SIZES.Width * 0.335,
-    height: SIZES.Width * 0.335,
-    margin: -0.4,
+  container: {
+    width: "33.333%",
+    aspectRatio: 1,
+    overflow: "hidden",
+    backgroundColor: "#111",
   },
-  images: {
-    position: "absolute",
+
+  image: {
     width: "100%",
     height: "100%",
-    borderWidth: 1,
-    zIndex: -1,
   },
-  Images: {
-    width: "100%",
-    height: "100%",
-    borderWidth: 1,
+
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
   },
 });

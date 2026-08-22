@@ -38,25 +38,16 @@ const useUploadReel = () => {
         new FormData();
 
       const safeMime =
-        mimeType?.startsWith(
+        mimeType &&
+        mimeType.startsWith(
           "video/"
         )
           ? mimeType
           : "video/mp4";
 
-      let extension = "mp4";
-
-      if (
-        safeMime ===
-        "video/quicktime"
-      ) {
-        extension = "mov";
-      } else if (
-        safeMime ===
-        "video/webm"
-      ) {
-        extension = "webm";
-      }
+      const extension =
+        safeMime.split("/")[1] ||
+        "mp4";
 
       formData.append(
         "file",
@@ -77,10 +68,6 @@ const useUploadReel = () => {
         `instagram/${currentUser.email}/reels`
       );
 
-      console.log(
-        "🎬 Cloudinary reel upload started"
-      );
-
       const response =
         await fetch(
           `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`,
@@ -90,54 +77,26 @@ const useUploadReel = () => {
           }
         );
 
-      const responseText =
-        await response.text();
-
-      let data = null;
-
-      try {
-        data =
-          JSON.parse(
-            responseText
-          );
-      } catch {
-        data = {
-          raw: responseText,
-        };
-      }
-
-      console.log(
-        "Cloudinary video HTTP:",
-        response.status
-      );
+      const data =
+        await response.json();
 
       if (!response.ok) {
         console.error(
-          "Cloudinary video response:",
+          "Cloudinary reel error:",
           data
         );
 
         throw new Error(
           data?.error?.message ||
-            `Cloudinary video upload failed (${response.status})`
+            "Cloudinary video upload failed."
         );
       }
 
       if (!data?.secure_url) {
-        console.error(
-          "Cloudinary missing video secure_url:",
-          data
-        );
-
         throw new Error(
-          "Cloudinary returned no video URL."
+          "Cloudinary did not return secure_url."
         );
       }
-
-      console.log(
-        "🎬 Cloudinary reel upload successful:",
-        data.secure_url
-      );
 
       await addDoc(
         collection(
@@ -195,7 +154,7 @@ const useUploadReel = () => {
       return true;
     } catch (error) {
       console.error(
-        "❌ Reel upload failed:",
+        "Reel upload failed:",
         error
       );
 

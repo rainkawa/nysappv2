@@ -1,57 +1,145 @@
 import { useState } from "react";
 
-const CLOUDINARY_CLOUD_NAME = "sqqodjug";
-const CLOUDINARY_UPLOAD_PRESET = "instagram_clon";
+const CLOUDINARY_CLOUD_NAME =
+  "sqqodjug";
+
+const CLOUDINARY_UPLOAD_PRESET =
+  "instagram_clon";
 
 const useUploadPicture = () => {
-  const [uploading, setUploading] = useState(false);
+  const [
+    uploading,
+    setUploading,
+  ] = useState(false);
 
-  const uploadPicture = async (uri, email, name) => {
-    if (uploading || !uri) return null;
+  const uploadPicture = async (
+    uri,
+    email,
+    name,
+    mimeType = "image/jpeg"
+  ) => {
+    if (
+      uploading ||
+      !uri
+    ) {
+      return null;
+    }
 
     setUploading(true);
 
     try {
-      const formData = new FormData();
+      const formData =
+        new FormData();
 
-      const fileName = name
-        ? `${name}.jpg`
-        : `upload_${Date.now()}.jpg`;
+      const safeMime =
+        mimeType?.startsWith(
+          "image/"
+        )
+          ? mimeType
+          : "image/jpeg";
 
-      formData.append("file", {
-        uri,
-        type: "image/jpeg",
-        name: fileName,
-      });
+      const extension =
+        safeMime ===
+        "image/png"
+          ? "png"
+          : safeMime ===
+            "image/webp"
+          ? "webp"
+          : "jpg";
 
-      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      const fileName =
+        name
+          ? `${name}.${extension}`
+          : `upload_${Date.now()}.${extension}`;
 
-      // Kullanıcı klasörü
-      formData.append("folder", `instagram/${email}`);
-
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      formData.append(
+        "file",
         {
-          method: "POST",
-          body: formData,
+          uri,
+          type: safeMime,
+          name: fileName,
         }
       );
 
-      const data = await response.json();
+      formData.append(
+        "upload_preset",
+        CLOUDINARY_UPLOAD_PRESET
+      );
+
+      formData.append(
+        "folder",
+        `instagram/${email || "unknown"}`
+      );
+
+      console.log(
+        "☁️ Cloudinary image upload started"
+      );
+
+      const response =
+        await fetch(
+          `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+      const responseText =
+        await response.text();
+
+      let data = null;
+
+      try {
+        data =
+          JSON.parse(
+            responseText
+          );
+      } catch {
+        data = {
+          raw: responseText,
+        };
+      }
+
+      console.log(
+        "Cloudinary HTTP:",
+        response.status
+      );
 
       if (!response.ok) {
-        console.error("Cloudinary upload error:", data);
+        console.error(
+          "Cloudinary response:",
+          data
+        );
+
         throw new Error(
-          data?.error?.message || "Cloudinary upload failed"
+          data?.error?.message ||
+            `Cloudinary upload failed (${response.status})`
         );
       }
 
-      console.log("☁️ Cloudinary upload successful");
-      console.log("🔗 URL:", data.secure_url);
+      if (!data?.secure_url) {
+        console.error(
+          "Cloudinary missing secure_url:",
+          data
+        );
+
+        throw new Error(
+          "Cloudinary returned no secure_url."
+        );
+      }
+
+      console.log(
+        "☁️ Cloudinary image upload successful:",
+        data.secure_url
+      );
 
       return data.secure_url;
     } catch (error) {
-      console.error("❌ Upload failed:", error);
+      console.error(
+        "❌ Cloudinary image upload failed:",
+        error
+      );
+
       return null;
     } finally {
       setUploading(false);

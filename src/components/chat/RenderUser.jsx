@@ -3,61 +3,72 @@ import {
   Text,
   View,
   TouchableOpacity,
-  Platform,
 } from "react-native";
-import { Image } from "expo-image";
-import { Feather } from "@expo/vector-icons";
-import useHandleSeenMessage from "../../hooks/useHandleSeenMessage";
+import {
+  Image,
+} from "expo-image";
 
-const RenderUser = ({ navigation, user, currentUser, handleCamera }) => {
-  const { handleSeenMessage } = useHandleSeenMessage();
+const RenderUser = ({
+  navigation,
+  user,
+  currentUser,
+  handleCamera,
+}) => {
+  if (
+    !user?.email ||
+    user.email ===
+      currentUser?.email
+  ) {
+    return null;
+  }
 
-  const handleLongName = (name) => {
-    if (name.length > 25) {
-      return `${name.substring(0, 23)}...`;
-    } else {
-      return name;
-    }
+  const handleOpenChat = () => {
+    navigation.navigate(
+      "Chating",
+      {
+        user,
+      }
+    );
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        onPress={() => {
-          if (user.status === "unseen" || user.status === "added") {
-            handleSeenMessage(user, currentUser);
-          }
-          navigation.navigate("Chating", { user });
+    <TouchableOpacity
+      onPress={
+        handleOpenChat
+      }
+      activeOpacity={0.8}
+      style={styles.container}
+    >
+      <Image
+        source={{
+          uri:
+            user?.profile_picture ||
+            "",
         }}
-        style={styles.rowContainer}
+        style={styles.image}
+      />
+
+      <View
+        style={
+          styles.userContainer
+        }
       >
-        <Image source={{ uri: user.profile_picture }} style={styles.image} />
-        {user.status === "unseen" ? (
-          <View style={styles.userContainer}>
-            <Text style={styles.username}>{handleLongName(user.name)}</Text>
-            <Text style={styles.statusBold}>New message</Text>
-          </View>
-        ) : user.status === "seen" ? (
-          <View style={styles.userContainer}>
-            <Text style={styles.username}>{handleLongName(user.name)}</Text>
-            <Text style={styles.status}>{user.username}</Text>
-          </View>
-        ) : user.status === "added" ? (
-          <View style={styles.userContainer}>
-            <Text style={styles.username}>{handleLongName(user.name)}</Text>
-            <Text style={styles.statusBold}>Just added</Text>
-          </View>
-        ) : (
-          <View style={styles.userContainer}>
-            <Text style={styles.username}>{handleLongName(user.name)}</Text>
-            <Text style={styles.status}>{user.username}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => handleCamera()}>
-        <Feather name="camera" size={22} color={"#fff"} style={styles.icon} />
-      </TouchableOpacity>
-    </View>
+        <Text
+          numberOfLines={1}
+          style={styles.username}
+        >
+          {user?.username ||
+            "Unknown user"}
+        </Text>
+
+        <Text
+          numberOfLines={1}
+          style={styles.name}
+        >
+          {user?.name || ""}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 };
 
@@ -67,41 +78,31 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginHorizontal: 15,
-    marginTop: Platform.OS === "android" ? 15 : 8,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
   },
-  rowContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
+
   image: {
-    height: 60,
-    width: 60,
-    borderRadius: 100,
-    borderWidth: 4,
-    borderColor: "#000",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#222",
   },
+
   userContainer: {
-    justifyContent: "center",
-    marginLeft: 10,
+    flex: 1,
+    marginLeft: 11,
   },
+
   username: {
     color: "#fff",
+    fontSize: 13,
     fontWeight: "700",
-    fontSize: 14,
   },
-  status: {
-    color: "#999",
-    fontSize: 14,
-    fontWeight: "400",
-  },
-  statusBold: {
-    color: "#fff",
+
+  name: {
+    color: "#888",
     fontSize: 12,
-    fontWeight: "700",
-  },
-  icon: {
-    marginRight: 10,
+    marginTop: 2,
   },
 });

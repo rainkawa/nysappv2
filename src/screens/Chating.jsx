@@ -1,185 +1,311 @@
 import {
   StyleSheet,
-  Text,
   View,
-  Platform,
+  Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
+  Platform,
+  FlatList,
+  KeyboardAvoidingView,
   TextInput,
   Keyboard,
-  KeyboardAvoidingView,
-  ActivityIndicator,
 } from "react-native";
-import { useState, useRef } from "react";
-import { SIZES } from "../constants";
-import { MaterialIcons, Ionicons, Feather } from "@expo/vector-icons";
-import { useUserContext } from "../contexts/UserContext";
-import { Image } from "expo-image";
-import RenderDate from "../components/chat/RenderDate";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  MaterialIcons,
+  Ionicons,
+} from "@expo/vector-icons";
+import {
+  useUserContext,
+} from "../contexts/UserContext";
 import RenderMessageA from "../components/chat/RenderMessageA";
 import RenderMessageB from "../components/chat/RenderMessageB";
 import useFetchMessages from "../hooks/useFetchMessages";
 import useChatSendMessage from "../hooks/useChatSendMessage";
-import RenderProfile from "../components/chat/RenderProfile";
-import { ScrollView } from "react-native-gesture-handler";
-import MessageModal, {
-  handleFeatureNotImplemented,
-} from "../components/shared/modals/MessageModal";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+} from "react-native-safe-area-context";
 
-const Chating = ({ navigation, route }) => {
-  const { user } = route.params;
-  const { currentUser } = useUserContext();
-  const { messages } = useFetchMessages({ user, currentUser });
-  const { chatSendMessage, loading, textMessage, setTextMessage } =
-    useChatSendMessage({ user, currentUser });
-  const scrollViewRef = useRef();
-  const [messageModalVisible, setMessageModalVisible] = useState(false);
+const Chating = ({
+  navigation,
+  route,
+}) => {
+  const {
+    user,
+  } = route.params || {};
+
+  const {
+    currentUser,
+  } = useUserContext();
+
+  const flatListRef =
+    useRef(null);
+
+  const {
+    messages = [],
+    loader: messagesLoading,
+  } = useFetchMessages({
+    user,
+    currentUser,
+  });
+
+  const {
+    chatSendMessage,
+    loading: sending,
+    textMessage,
+    setTextMessage,
+  } = useChatSendMessage({
+    user,
+    currentUser,
+  });
+
+  const [
+    keyboardVisible,
+    setKeyboardVisible,
+  ] = useState(false);
+
+  useEffect(() => {
+    const show =
+      Keyboard.addListener(
+        Platform.OS === "ios"
+          ? "keyboardWillShow"
+          : "keyboardDidShow",
+        () =>
+          setKeyboardVisible(true)
+      );
+
+    const hide =
+      Keyboard.addListener(
+        Platform.OS === "ios"
+          ? "keyboardWillHide"
+          : "keyboardDidHide",
+        () =>
+          setKeyboardVisible(false)
+      );
+
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!messages.length) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToEnd(
+        { animated: false }
+      );
+    });
+  }, [messages.length]);
+
+  const handleSend = async () => {
+    const success =
+      await chatSendMessage();
+
+    if (success) {
+      requestAnimationFrame(() => {
+        flatListRef.current?.scrollToEnd(
+          { animated: true }
+        );
+      });
+    }
+  };
+
+  if (
+    !user?.email ||
+    !currentUser?.email
+  ) {
+    return (
+      <SafeAreaView
+        style={styles.container}
+      >
+        <View
+          style={
+            styles.invalidContainer
+          }
+        >
+          <Text
+            style={
+              styles.invalidText
+            }
+          >
+            Chat unavailable
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.chatContainer}
+    <SafeAreaView
+      style={styles.container}
+      edges={[
+        "top",
+        "bottom",
+      ]}
+    >
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={
+          Platform.OS === "ios"
+            ? "padding"
+            : "height"
+        }
+        keyboardVerticalOffset={
+          Platform.OS === "android"
+            ? 0
+            : 4
+        }
+      >
+        <View
+          style={styles.header}
         >
-          <View style={styles.titleContainer}>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={styles.rowContainer}
-            >
-              <MaterialIcons name="arrow-back-ios" size={28} color={"#fff"} />
-              <Image
-                source={{ uri: user.profile_picture }}
-                style={styles.profilePicture}
-              />
-              <View>
-                <Text style={styles.textTitle}>{user.name}</Text>
-                <Text style={styles.subtitle}>{user.username}</Text>
-              </View>
-            </TouchableOpacity>
-            <View style={[styles.rowContainer, { gap: 20 }]}>
-              <TouchableOpacity
-                onPress={() =>
-                  handleFeatureNotImplemented(setMessageModalVisible)
-                }
-              >
-                <Feather name="phone" size={25} color={"#fff"} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() =>
-                  handleFeatureNotImplemented(setMessageModalVisible)
-                }
-              >
-                <Feather
-                  name="video"
-                  size={25}
-                  color={"#fff"}
-                  style={{ transform: [{ scaleY: 1.15 }] }}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-          <ScrollView
-            snapToAlignment="end"
-            ref={scrollViewRef}
-            style={styles.scrollView}
+          <TouchableOpacity
+            onPress={() =>
+              navigation.goBack()
+            }
+            hitSlop={8}
           >
-            <RenderProfile navigation={navigation} user={user} />
-            {messages.map((message, index) =>
-              message.who === "timestamp" ? (
-                <View key={index}>
-                  <RenderDate item={message} />
-                </View>
-              ) : message.who === "user" ? (
-                <View style={styles.userContainer} key={index}>
-                  <Image
-                    source={{ uri: user.profile_picture }}
-                    style={styles.littleProfilePicture}
-                  />
-                  <RenderMessageA item={message} />
-                </View>
-              ) : (
-                <View key={index} style={styles.currentUserContainer}>
-                  <RenderMessageB item={message} />
-                </View>
-              )
-            )}
-          </ScrollView>
-          <View style={styles.searchWrapper}>
-            <View style={styles.rowContainer}>
-              <TouchableOpacity
-                onPress={() =>
-                  handleFeatureNotImplemented(setMessageModalVisible)
-                }
-                style={styles.cameraWrapper}
-              >
-                <Ionicons
-                  name="camera"
-                  size={20}
-                  color={"#fff"}
-                  style={styles.searchIcon}
-                />
-              </TouchableOpacity>
+            <MaterialIcons
+              name="arrow-back-ios"
+              size={21}
+              color="#fff"
+            />
+          </TouchableOpacity>
 
-              <TextInput
-                value={textMessage}
-                onChangeText={setTextMessage}
-                maxLength={255}
-                autoCapitalize="sentences"
-                autoCorrect={true}
-                placeholder="Message..."
-                placeholderTextColor={"#999"}
-                style={styles.searchInput}
-                enterKeyHint="search"
-                onFocus={() =>
-                  setTimeout(() => {
-                    scrollViewRef.current.scrollToEnd({ animated: true });
-                  }, 100)
-                }
-                multiline
+          <TouchableOpacity
+            style={styles.headerUser}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={
+                styles.headerUsername
+              }
+              numberOfLines={1}
+            >
+              {user.username ||
+                "User"}
+            </Text>
+          </TouchableOpacity>
+
+          <View
+            style={
+              styles.headerSpacer
+            }
+          />
+        </View>
+
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(
+            item,
+            index
+          ) =>
+            item?.id?.toString() ||
+            index.toString()
+          }
+          renderItem={({
+            item,
+          }) => {
+            const isMine =
+              item?.who ===
+              "current";
+
+            return isMine ? (
+              <RenderMessageA
+                item={item}
               />
-            </View>
-            {loading ? (
-              <ActivityIndicator style={{ marginRight: 14 }} />
-            ) : textMessage.length > 0 ? (
-              <TouchableOpacity
-                onPress={() => {
-                  textMessage !== "" && chatSendMessage();
-                }}
-                style={styles.rowContainer}
-              >
-                <Text style={styles.sendText}>Send</Text>
-              </TouchableOpacity>
             ) : (
-              <View style={styles.rowContainer}>
-                <TouchableOpacity
-                  onPress={() =>
-                    handleFeatureNotImplemented(setMessageModalVisible)
+              <RenderMessageB
+                item={item}
+              />
+            );
+          }}
+          contentContainerStyle={[
+            styles.messagesContent,
+            keyboardVisible &&
+              styles.messagesKeyboardOpen,
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={
+            false
+          }
+          onContentSizeChange={() =>
+            flatListRef.current?.scrollToEnd(
+              { animated: false }
+            )
+          }
+          ListEmptyComponent={
+            !messagesLoading ? (
+              <View
+                style={
+                  styles.emptyMessages
+                }
+              >
+                <Text
+                  style={
+                    styles.emptyText
                   }
-                  style={{ marginRight: 6 }}
                 >
-                  <Ionicons name="image-outline" size={22} color={"#fff"} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() =>
-                    handleFeatureNotImplemented(setMessageModalVisible)
-                  }
-                  style={{ marginRight: 12 }}
-                >
-                  <Feather name="mic" size={19} color={"#fff"} />
-                </TouchableOpacity>
+                  Start the conversation
+                </Text>
               </View>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-        <MessageModal
-          messageModalVisible={messageModalVisible}
-          message={"This feature is not yet implemented."}
-          height={70}
+            ) : null
+          }
         />
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+
+        <View
+          style={styles.inputArea}
+        >
+          <View
+            style={styles.inputWrapper}
+          >
+            <TextInput
+              value={textMessage}
+              onChangeText={
+                setTextMessage
+              }
+              placeholder="Message..."
+              placeholderTextColor="#777"
+              style={styles.input}
+              multiline
+              maxLength={2000}
+              textAlignVertical="center"
+              blurOnSubmit={false}
+            />
+
+            <TouchableOpacity
+              onPress={handleSend}
+              disabled={
+                sending ||
+                !textMessage.trim()
+              }
+              style={
+                styles.sendButton
+              }
+              hitSlop={8}
+            >
+              <Ionicons
+                name="send"
+                size={20}
+                color={
+                  textMessage.trim()
+                    ? "#09f"
+                    : "#555"
+                }
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -190,92 +316,107 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
-  chatContainer: {
+
+  keyboardContainer: {
     flex: 1,
-    justifyContent: "space-between",
   },
-  rowContainer: {
+
+  header: {
+    minHeight: 48,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#171717",
   },
-  profilePicture: {
-    height: 44,
-    width: 44,
-    borderRadius: 100,
-    borderWidth: 4,
-    borderColor: "#000",
-    marginHorizontal: 5,
+
+  headerUser: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 25,
   },
-  titleContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginHorizontal: 20,
-    marginTop: 9,
-  },
-  textTitle: {
+
+  headerUsername: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
   },
-  subtitle: {
-    color: "#bbb",
-    fontSize: 12,
-    fontWeight: "300",
-    marginBottom: 6,
-  },
-  searchWrapper: {
-    marginTop: 10,
-    paddingVertical: 3,
-    marginLeft: 12,
-    marginRight: 12,
-    backgroundColor: "#252525",
-    minHeight: 46,
-    borderRadius: 50,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  searchInput: {
-    color: "#fff",
-    height: "100%",
-    fontSize: 17,
-    marginBottom: 4,
-    marginLeft: 10,
-    width: SIZES.Width * 0.65,
-  },
-  cameraWrapper: {
-    marginLeft: 8,
-    height: 34,
-    width: 34,
-    borderRadius: 100,
-    backgroundColor: "#07f",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sendText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-    marginRight: 15,
-  },
-  scrollView: {
-    flex: 1,
-    marginHorizontal: 15,
-  },
-  userContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  littleProfilePicture: {
-    height: 30,
+
+  headerSpacer: {
     width: 30,
-    borderRadius: 100,
   },
-  currentUserContainer: {
-    alignItems: "flex-end",
+
+  messagesContent: {
+    flexGrow: 1,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+
+  messagesKeyboardOpen: {
+    paddingBottom: 5,
+  },
+
+  emptyMessages: {
+    flex: 1,
     justifyContent: "center",
-    marginBottom: 10,
+    alignItems: "center",
+  },
+
+  emptyText: {
+    color: "#666",
+    fontSize: 13,
+  },
+
+  inputArea: {
+    borderTopWidth: 1,
+    borderTopColor: "#1d1d1d",
+    backgroundColor: "#000",
+    paddingHorizontal: 10,
+    paddingTop: 7,
+    paddingBottom:
+      Platform.OS === "android"
+        ? 7
+        : 9,
+  },
+
+  inputWrapper: {
+    minHeight: 42,
+    maxHeight: 115,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#444",
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingLeft: 12,
+    paddingRight: 6,
+  },
+
+  input: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 14,
+    minHeight: 40,
+    maxHeight: 95,
+    paddingTop: 9,
+    paddingBottom: 8,
+  },
+
+  sendButton: {
+    height: 38,
+    width: 38,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  invalidContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  invalidText: {
+    color: "#777",
+    fontSize: 14,
   },
 });

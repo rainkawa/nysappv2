@@ -36,19 +36,6 @@ const NewReel = ({ navigation, route }) => {
   const selectedImage =
     route?.params?.selectedImage;
 
-  useEffect(() => {
-    console.log(
-      "NEW REEL OPENED:",
-      {
-        selectedImage,
-        uri:
-          typeof selectedImage === "string"
-            ? selectedImage
-            : selectedImage?.uri,
-      }
-    );
-  }, [selectedImage]);
-
   const videoUri =
     typeof selectedImage === "string"
       ? selectedImage
@@ -141,13 +128,13 @@ const NewReel = ({ navigation, route }) => {
 
       if (!success) {
         setErrorMessage(
-          "Reel could not be published. Check your connection and try again."
+          "Reel upload failed. Please try again."
         );
         setMessageModalVisible(true);
         return;
       }
 
-      navigation.replace("Main Screen");
+      navigation.navigate("Main Screen");
     } catch (error) {
       console.error(
         "NewReel submit error:",
@@ -156,7 +143,7 @@ const NewReel = ({ navigation, route }) => {
 
       setErrorMessage(
         error?.message ||
-          "Reel could not be published. Check your connection and try again."
+          "Reel upload failed. Please try again."
       );
       setMessageModalVisible(true);
     }

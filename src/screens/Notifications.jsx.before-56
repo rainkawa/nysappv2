@@ -127,30 +127,22 @@ const Notifications = ({
               item.type === "request"
             ) {
               return (
-                <View style={styles.requestSection}>
-                  <Text style={styles.sectionLabel}>
-                    Follow requests
-                  </Text>
-
-                  <Requests
-                    user={item.request}
-                    currentUser={currentUser}
-                    navigation={navigation}
-                  />
-                </View>
+                <Requests
+                  user={item.request}
+                  currentUser={currentUser}
+                  navigation={navigation}
+                />
               );
             }
 
             return (
-              <View style={styles.interactionSection}>
-                <Interaction
-                  navigation={navigation}
-                  notification={
-                    item.notification
-                  }
-                  currentUser={currentUser}
-                />
-              </View>
+              <Interaction
+                navigation={navigation}
+                notification={
+                  item.notification
+                }
+                currentUser={currentUser}
+              />
             );
           }}
           contentContainerStyle={
@@ -233,25 +225,6 @@ const styles = StyleSheet.create({
 
   listContent: {
     paddingBottom: 35,
-  },
-
-  requestSection: {
-    paddingBottom: 2,
-  },
-
-  interactionSection: {
-    paddingBottom: 1,
-  },
-
-  sectionLabel: {
-    color: "#777",
-    fontSize: 11,
-    fontWeight: "700",
-    marginHorizontal: 15,
-    marginTop: 9,
-    marginBottom: 1,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
 
   footerContainer: {

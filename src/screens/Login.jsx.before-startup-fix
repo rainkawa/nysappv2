@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import {
   useState,
+  useEffect,
 } from "react";
 import {
   MaterialCommunityIcons,
@@ -23,6 +24,7 @@ import {
   where,
 } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
+import { useUserContext } from "../contexts/UserContext";
 import {
   SafeAreaView,
 } from "react-native-safe-area-context";
@@ -30,6 +32,9 @@ import {
 const Login = ({
   navigation,
 }) => {
+  const { currentUser } =
+    useUserContext();
+
   const [identifier, setIdentifier] =
     useState("");
 
@@ -46,6 +51,12 @@ const Login = ({
 
   const [error, setError] =
     useState("");
+
+  useEffect(() => {
+    if (currentUser) {
+      return;
+    }
+  }, [currentUser]);
 
   const findEmailByUsername =
     async (username) => {

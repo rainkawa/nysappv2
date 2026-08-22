@@ -6,17 +6,25 @@ import {
   Platform,
 } from "react-native";
 import { Image } from "expo-image";
-import useCheckStoriesSeen from "../../hooks/useCheckStoriesSeen";
-import { LinearGradient } from "expo-linear-gradient";
+import {
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
 
 const getMillis = (value) => {
   if (!value) return 0;
 
-  if (typeof value?.toMillis === "function") {
+  if (
+    typeof value?.toMillis ===
+    "function"
+  ) {
     return value.toMillis();
   }
 
-  if (typeof value?.seconds === "number") {
+  if (
+    typeof value?.seconds ===
+    "number"
+  ) {
     return value.seconds * 1000;
   }
 
@@ -30,41 +38,43 @@ const getMillis = (value) => {
 const formatTime = (value) => {
   const millis = getMillis(value);
 
-  if (!millis) {
-    return "";
-  }
+  if (!millis) return "";
 
   const date = new Date(millis);
   const now = new Date();
 
   const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
+    date.getFullYear() ===
+      now.getFullYear() &&
+    date.getMonth() ===
+      now.getMonth() &&
+    date.getDate() ===
+      now.getDate();
 
   if (sameDay) {
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return date.toLocaleTimeString(
+      [],
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    );
   }
 
-  return date.toLocaleDateString([], {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return date.toLocaleDateString(
+    [],
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }
+  );
 };
 
 const Interaction = ({
   navigation,
   notification,
-  currentUser,
 }) => {
-  const {
-    checkStoriesSeen,
-  } = useCheckStoriesSeen();
-
   if (!notification) {
     return null;
   }
@@ -81,127 +91,153 @@ const Interaction = ({
     createdAt,
   } = notification;
 
-  const isComment = type === "comment";
+  const isComment =
+    type === "comment";
+
+  const isLike =
+    type === "like";
+
+  const time =
+    formatTime(createdAt);
+
   const actorName =
-    actorUsername || "Someone";
+    actorUsername ||
+    "Someone";
 
-  const time = formatTime(createdAt);
+  const handleProfile =
+    () => {
+      if (!actorEmail) return;
 
-  const handleUserProfile = () => {
-    if (!actorEmail) {
-      return;
-    }
+      navigation.navigate(
+        "UserDetail",
+        {
+          email: actorEmail,
+        }
+      );
+    };
 
-    navigation.navigate("UserDetail", {
-      email: actorEmail,
-    });
-  };
+  const handlePost =
+    () => {
+      if (
+        !postId ||
+        !postOwnerEmail
+      ) {
+        return;
+      }
 
-  const handleCheckPost = () => {
-    if (!postId || !postOwnerEmail) {
-      return;
-    }
-
-    navigation.navigate("Detail", {
-      item: {
-        id: postId,
-        owner_email: postOwnerEmail,
-        imageUrl: postImage || "",
-      },
-    });
-  };
-
-  const seenStory =
-    actorEmail && currentUser?.email
-      ? checkStoriesSeen(
-          actorEmail,
-          currentUser.email
-        )
-      : false;
+      navigation.navigate(
+        "Detail",
+        {
+          item: {
+            id: postId,
+            owner_email:
+              postOwnerEmail,
+            imageUrl:
+              postImage || "",
+          },
+        }
+      );
+    };
 
   return (
     <View style={styles.container}>
-      <View style={styles.rowContainer}>
+      <View style={styles.left}>
         <TouchableOpacity
-          onPress={handleUserProfile}
+          onPress={handleProfile}
           disabled={!actorEmail}
         >
-          {seenStory ? (
-            <LinearGradient
-              start={[0.9, 0.45]}
-              end={[0.07, 1.03]}
-              colors={[
-                "#ff00ff",
-                "#ff4400",
-                "#ffff00",
-              ]}
-              style={styles.rainbowBorder}
-            >
-              <Image
-                source={{
-                  uri: actorProfilePicture || "",
-                }}
-                style={styles.image}
-              />
-            </LinearGradient>
-          ) : (
-            <Image
-              source={{
-                uri: actorProfilePicture || "",
-              }}
-              style={styles.nonRainbowImage}
-            />
-          )}
+          <Image
+            source={{
+              uri:
+                actorProfilePicture ||
+                "",
+            }}
+            style={styles.avatar}
+          />
         </TouchableOpacity>
 
-        <View style={styles.userContainer}>
+        <View style={styles.content}>
           <TouchableOpacity
-            onPress={handleUserProfile}
+            onPress={handleProfile}
             disabled={!actorEmail}
           >
-            <Text style={styles.username}>
+            <Text
+              numberOfLines={1}
+              style={styles.username}
+            >
               {actorName}
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleCheckPost}
-            disabled={!postId}
+          <View
+            style={styles.actionRow}
           >
-            <View style={styles.messageRow}>
-              <Text style={styles.name}>
+            <View
+              style={styles.actionIcon}
+            >
+              {isComment ? (
+                <MaterialCommunityIcons
+                  name="comment-outline"
+                  size={16}
+                  color="#fff"
+                />
+              ) : (
+                <Ionicons
+                  name="heart-outline"
+                  size={16}
+                  color="#fff"
+                />
+              )}
+            </View>
+
+            <TouchableOpacity
+              onPress={handlePost}
+              disabled={!postId}
+              style={styles.textBlock}
+            >
+              <Text
+                numberOfLines={1}
+                style={styles.actionText}
+              >
                 {isComment
-                  ? "Commented your post."
-                  : "Liked your post."}
+                  ? "Commented on your post"
+                  : isLike
+                  ? "Liked your post"
+                  : "Interacted with your post"}
               </Text>
 
               {time ? (
-                <Text style={styles.time}>
-                  {" "}
+                <Text
+                  style={styles.time}
+                >
                   · {time}
                 </Text>
               ) : null}
-            </View>
+            </TouchableOpacity>
+          </View>
 
-            {isComment && comment ? (
-              <Text
-                numberOfLines={1}
-                style={styles.commentPreview}
-              >
-                “{comment}”
-              </Text>
-            ) : null}
-          </TouchableOpacity>
+          {isComment &&
+          comment ? (
+            <Text
+              numberOfLines={1}
+              style={
+                styles.commentPreview
+              }
+            >
+              “{comment}”
+            </Text>
+          ) : null}
         </View>
       </View>
 
       <TouchableOpacity
-        onPress={handleCheckPost}
+        onPress={handlePost}
         disabled={!postId}
       >
         <Image
           source={{
-            uri: postImage || "",
+            uri:
+              postImage || "",
           }}
           style={styles.postImage}
           contentFit="cover"
@@ -217,82 +253,88 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     marginHorizontal: 12,
     marginTop:
-      Platform.OS === "android" ? 15 : 8,
+      Platform.OS === "android"
+        ? 12
+        : 8,
+    paddingVertical: 2,
   },
 
-  rowContainer: {
+  left: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
+    minWidth: 0,
   },
 
-  rainbowBorder: {
-    borderRadius: 100,
-    height: 58,
-    width: 58,
-    justifyContent: "center",
-    alignItems: "center",
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#222",
   },
 
-  image: {
-    height: 56,
-    width: 56,
-    borderRadius: 100,
-    borderWidth: 2.5,
-    borderColor: "#000",
-  },
-
-  nonRainbowImage: {
-    height: 58,
-    width: 58,
-    borderWidth: 3,
-    borderColor: "#000",
-    borderRadius: 100,
-  },
-
-  userContainer: {
-    justifyContent: "center",
-    marginLeft: 15,
+  content: {
     flex: 1,
+    minWidth: 0,
+    marginLeft: 10,
     paddingRight: 8,
   },
 
   username: {
     color: "#fff",
-    fontWeight: "700",
-    fontSize: 14,
-  },
-
-  messageRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-  },
-
-  name: {
-    color: "#ddd",
     fontSize: 13,
-    fontWeight: "400",
+    fontWeight: "700",
+  },
+
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 3,
+  },
+
+  actionIcon: {
+    width: 25,
+    height: 25,
+    borderRadius: 13,
+    backgroundColor: "#2a2a2a",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 6,
+  },
+
+  textBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    minWidth: 0,
+  },
+
+  actionText: {
+    color: "#ddd",
+    fontSize: 12,
+    flexShrink: 1,
   },
 
   time: {
-    color: "#888",
-    fontSize: 12,
+    color: "#777",
+    fontSize: 11,
+    marginLeft: 4,
   },
 
   commentPreview: {
     color: "#777",
-    fontSize: 12,
-    marginTop: 2,
-    maxWidth: 210,
+    fontSize: 11,
+    marginTop: 3,
+    maxWidth: 230,
   },
 
   postImage: {
-    height: 60,
-    width: 60,
-    marginRight: 2,
+    width: 48,
+    height: 48,
+    marginLeft: 4,
   },
 });

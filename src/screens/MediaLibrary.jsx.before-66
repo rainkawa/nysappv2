@@ -436,95 +436,54 @@ const MediaLibraryScreen = ({
     };
 
   const handleNext = () => {
-    console.log(
-      "MEDIA NEXT PRESSED:",
-      {
-        selectedType,
-        selectedMedia,
-      }
-    );
+    if (!selectedMedia) {
+      return;
+    }
 
     if (
-      !selectedMedia?.uri
+      selectedType ===
+      "New post"
     ) {
-      console.warn(
-        "MEDIA NEXT: no selected media"
+      navigation.navigate(
+        "NewPost",
+        {
+          selectedImage:
+            selectedMedia.uri,
+          mediaType:
+            selectedMedia.type,
+          width:
+            selectedMedia.width,
+          height:
+            selectedMedia.height,
+        }
       );
       return;
     }
 
-    try {
-      if (
-        selectedType ===
-        "New post"
-      ) {
-        console.log(
-          "MEDIA NEXT -> NewPost"
-        );
-
-        navigation.navigate(
-          "NewPost",
-          {
-            selectedImage:
-              selectedMedia.uri,
-            mediaType:
-              selectedMedia.type,
-            width:
-              selectedMedia.width,
-            height:
-              selectedMedia.height,
-          }
-        );
-
-        return;
-      }
-
-      if (
-        selectedType ===
-        "Add to story"
-      ) {
-        console.log(
-          "MEDIA NEXT -> NewStory"
-        );
-
-        navigation.navigate(
-          "NewStory",
-          {
-            selectedImage:
-              selectedMedia,
-          }
-        );
-
-        return;
-      }
-
-      if (
-        selectedType ===
-        "New reel"
-      ) {
-        console.log(
-          "MEDIA NEXT -> NewReel"
-        );
-
-        navigation.navigate(
-          "NewReel",
-          {
-            selectedImage:
-              selectedMedia,
-          }
-        );
-
-        return;
-      }
-
-      console.warn(
-        "MEDIA NEXT: unknown selectedType:",
-        selectedType
+    if (
+      selectedType ===
+      "Add to story"
+    ) {
+      navigation.navigate(
+        "NewStory",
+        {
+          selectedImage:
+            selectedMedia,
+        }
       );
-    } catch (error) {
-      console.error(
-        "MEDIA NEXT NAVIGATION ERROR:",
-        error
+      return;
+    }
+
+    if (
+      selectedType ===
+      "New reel"
+    ) {
+      navigation.navigate(
+        "NewReel",
+        {
+          selectedImage:
+            selectedMedia,
+        }
       );
     }
   };

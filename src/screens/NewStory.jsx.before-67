@@ -43,16 +43,6 @@ const NewStory = ({
     selectedImage,
   } = route?.params || {};
 
-  useEffect(() => {
-    console.log(
-      "NEW STORY OPENED:",
-      {
-        selectedImage,
-        uri: selectedImage?.uri,
-      }
-    );
-  }, [selectedImage]);
-
   const {
     uploadStory,
     isLoading,

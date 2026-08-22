@@ -36,19 +36,6 @@ const NewReel = ({ navigation, route }) => {
   const selectedImage =
     route?.params?.selectedImage;
 
-  useEffect(() => {
-    console.log(
-      "NEW REEL OPENED:",
-      {
-        selectedImage,
-        uri:
-          typeof selectedImage === "string"
-            ? selectedImage
-            : selectedImage?.uri,
-      }
-    );
-  }, [selectedImage]);
-
   const videoUri =
     typeof selectedImage === "string"
       ? selectedImage
