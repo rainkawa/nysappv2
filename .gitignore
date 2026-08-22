@@ -50,3 +50,11 @@ app.json.backup
 *.bak
 *.bak2
 *.bak3
+
+# Local backups
+android.backup/
+src.backup-*/
+app.json.backup
+*.bak
+*.bak2
+*.bak3
