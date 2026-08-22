@@ -16,12 +16,37 @@ import useCheckStoriesSeen from "../../hooks/useCheckStoriesSeen";
 import { SIZES } from "../../constants";
 
 const Followers = ({ user, currentUser, navigation }) => {
-  const { checkStoriesSeen } = useCheckStoriesSeen();
-  const { handleFollow } = useHandleFollow({ user });
+  const {
+    checkStoriesSeen,
+  } = useCheckStoriesSeen();
+
+  const { handleFollow } = useHandleFollow({
+    user,
+  });
+
   const [modalVisible, setModalVisible] = useState(false);
 
+  if (!user?.email || !currentUser?.email) {
+    return null;
+  }
+
+  const following = Array.isArray(currentUser.following)
+    ? currentUser.following
+    : [];
+
+  const followingRequest = Array.isArray(
+    currentUser.following_request
+  )
+    ? currentUser.following_request
+    : [];
+
+  const isFollowing = following.includes(user.email);
+  const isRequested = followingRequest.includes(
+    user.email
+  );
+
   const handleModal = () => {
-    setModalVisible(!modalVisible);
+    setModalVisible((previous) => !previous);
   };
 
   const handleViewProfile = () => {
@@ -30,68 +55,104 @@ const Followers = ({ user, currentUser, navigation }) => {
     });
   };
 
+  const handleFollowPress = () => {
+    if (!isFollowing && !isRequested) {
+      handleFollow(user.email);
+    }
+  };
+
+  const storySeen = checkStoriesSeen(
+    user.username,
+    currentUser.email
+  );
+
   return (
     <View style={styles.container}>
-      <TouchableWithoutFeedback onPress={() => handleViewProfile()}>
+      <TouchableWithoutFeedback
+        onPress={handleViewProfile}
+      >
         <View style={styles.rowContainer}>
-          {checkStoriesSeen(user.username, currentUser.email) ? (
+          {storySeen ? (
             <LinearGradient
               start={[0.9, 0.45]}
               end={[0.07, 1.03]}
-              colors={["#ff00ff", "#ff4400", "#ffff00"]}
+              colors={[
+                "#ff00ff",
+                "#ff4400",
+                "#ffff00",
+              ]}
               style={styles.rainbowBorder}
             >
               <Image
-                source={{ uri: user.profile_picture }}
+                source={{
+                  uri: user.profile_picture || "",
+                }}
                 style={styles.image}
               />
             </LinearGradient>
           ) : (
             <Image
-              source={{ uri: user.profile_picture }}
+              source={{
+                uri: user.profile_picture || "",
+              }}
               style={styles.nonRainbowImage}
             />
           )}
 
           <View style={styles.userContainer}>
-            <View style={styles.rowContainer}>
-              {currentUser.following.includes(user.email) ? (
-                <Text numberOfLines={1} style={styles.username}>
-                  {user.username}
-                </Text>
-              ) : currentUser.following_request.includes(user.email) ? (
-                <View style={{ flexDirection: "row" }}>
-                  <Text numberOfLines={1} style={styles.username}>
-                    {user.username}
+            <View style={styles.innerRow}>
+              <Text
+                numberOfLines={1}
+                style={styles.username}
+              >
+                {user.username || "Unknown user"}
+              </Text>
+
+              {!isFollowing && (
+                <TouchableOpacity
+                  onPress={handleFollowPress}
+                  disabled={isRequested}
+                >
+                  <Text
+                    style={
+                      isRequested
+                        ? styles.buttonTextRequested
+                        : styles.buttonTextFollow
+                    }
+                  >
+                    {isRequested
+                      ? " • Requested"
+                      : " • Follow"}
                   </Text>
-                  <TouchableOpacity onPress={() => handleFollow(user.email)}>
-                    <Text style={styles.buttonTextRequested}> • Requested</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={{ flexDirection: "row" }}>
-                  <Text numberOfLines={1} style={styles.username}>
-                    {user.username}
-                  </Text>
-                  <TouchableOpacity onPress={() => handleFollow(user.email)}>
-                    <Text style={styles.buttonTextFollow}> • Follow</Text>
-                  </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               )}
             </View>
 
-            <Text style={styles.name}>{user.name}</Text>
+            <Text style={styles.name}>
+              {user.name || ""}
+            </Text>
           </View>
         </View>
       </TouchableWithoutFeedback>
 
-      <TouchableOpacity onPress={() => handleModal()}>
+      <TouchableOpacity onPress={handleModal}>
         <View style={styles.button}>
-          <Text style={styles.removeText}>Remove</Text>
+          <Text style={styles.removeText}>
+            Remove
+          </Text>
         </View>
       </TouchableOpacity>
-      <Modal animationType="slide" transparent={true} visible={modalVisible}>
-        <RemoveFollower user={user} handleModal={handleModal} />
+
+      <Modal
+        animationType="slide"
+        transparent
+        visible={modalVisible}
+        onRequestClose={handleModal}
+      >
+        <RemoveFollower
+          user={user}
+          handleModal={handleModal}
+        />
       </Modal>
     </View>
   );
@@ -107,9 +168,17 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginTop: 15,
   },
+
   rowContainer: {
     flexDirection: "row",
+    flex: 1,
   },
+
+  innerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
   rainbowBorder: {
     borderRadius: 100,
     height: 64,
@@ -117,6 +186,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
   image: {
     height: 60,
     width: 60,
@@ -124,6 +194,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "#000",
   },
+
   nonRainbowImage: {
     height: 64,
     width: 64,
@@ -131,9 +202,12 @@ const styles = StyleSheet.create({
     borderColor: "#000",
     borderRadius: 100,
   },
+
   userContainer: {
     justifyContent: "center",
+    flex: 1,
   },
+
   username: {
     marginLeft: 12,
     color: "#fff",
@@ -141,6 +215,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     maxWidth: SIZES.Width * 0.29,
   },
+
   name: {
     marginTop: 2,
     marginLeft: 12,
@@ -150,30 +225,38 @@ const styles = StyleSheet.create({
     width: SIZES.Width * 0.45,
     marginBottom: 4,
   },
+
   button: {
     backgroundColor: "#333",
     justifyContent: "center",
     alignItems: "center",
-    height: Platform.OS === "android" ? 36 : 32,
+    height:
+      Platform.OS === "android" ? 36 : 32,
     width: 90,
     borderRadius: 10,
   },
+
   buttonTextFollow: {
     color: "#08f",
     fontWeight: "700",
     fontSize: 13,
-    marginBottom: -3.5,
+    marginBottom:
+      Platform.OS === "android" ? -3 : 0,
   },
+
   buttonTextRequested: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 13,
-    marginBottom: -3.5,
+    marginBottom:
+      Platform.OS === "android" ? -3 : 0,
   },
+
   removeText: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 13,
-    marginBottom: Platform.OS === "android" ? 4 : 0,
+    marginBottom:
+      Platform.OS === "android" ? 4 : 0,
   },
 });

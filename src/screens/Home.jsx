@@ -1,4 +1,11 @@
-import { StyleSheet, Animated, FlatList, View } from "react-native";
+import {
+  StyleSheet,
+  Animated,
+  FlatList,
+  View,
+  RefreshControl,
+} from "react-native";
+import { useState } from "react";
 import { useUserContext } from "../contexts/UserContext";
 import useHeaderScrollAnim from "../utils/useHeaderScrollAnim";
 import useFetchPosts from "../hooks/useFetchPosts";
@@ -10,28 +17,81 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const Home = ({ navigation }) => {
   const { currentUser } = useUserContext();
-  const { headerTranslate, headerOpacity, scrollY } = useHeaderScrollAnim(42);
-  const { posts, isLoading, fetchOlderPosts } = useFetchPosts();
+
+  const {
+    headerTranslate,
+    headerOpacity,
+    scrollY,
+  } = useHeaderScrollAnim(52);
+
+  const {
+    posts = [],
+    isLoading,
+    fetchOlderPosts,
+    refreshPosts,
+  } = useFetchPosts();
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+
+    setRefreshing(true);
+
+    try {
+      if (typeof refreshPosts === "function") {
+        await refreshPosts();
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const renderPostItem = ({ item }) => (
-    <Posts navigation={navigation} post={item} currentUser={currentUser} />
+    <Posts
+      navigation={navigation}
+      post={item}
+      currentUser={currentUser}
+    />
   );
 
   const renderHeaderComponent = () => (
-    <Stories navigation={navigation} currentUser={currentUser} />
+    <Stories
+      navigation={navigation}
+      currentUser={currentUser}
+    />
   );
 
   const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false }
+    [
+      {
+        nativeEvent: {
+          contentOffset: {
+            y: scrollY,
+          },
+        },
+      },
+    ],
+    {
+      useNativeDriver: false,
+    }
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView
+      style={styles.container}
+      edges={["top", "bottom"]}
+    >
       <Animated.View
         style={[
-          styles.header(65),
-          { transform: [{ translateY: headerTranslate }] },
+          styles.header,
+          {
+            transform: [
+              {
+                translateY: headerTranslate,
+              },
+            ],
+          },
         ]}
       >
         <Header
@@ -44,25 +104,58 @@ const Home = ({ navigation }) => {
       {posts.length > 0 ? (
         <FlatList
           data={posts}
-          keyExtractor={(item, index) => index.toString()}
+          keyExtractor={(item, index) =>
+            item?.id?.toString() ||
+            index.toString()
+          }
           renderItem={renderPostItem}
-          ListHeaderComponent={renderHeaderComponent}
-          contentContainerStyle={styles.contentContainer(52)}
+          ListHeaderComponent={
+            renderHeaderComponent
+          }
+          contentContainerStyle={
+            styles.contentContainer
+          }
           onScroll={handleScroll}
           scrollEventThrottle={16}
-          onEndReached={() => fetchOlderPosts()}
+          onEndReached={fetchOlderPosts}
           onEndReachedThreshold={0.5}
-          initialNumToRender={20}
-          refreshing={isLoading}
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={7}
+          refreshControl={
+            <RefreshControl
+              refreshing={
+                refreshing || isLoading
+              }
+              onRefresh={handleRefresh}
+              tintColor="#fff"
+              colors={["#fff"]}
+              progressViewOffset={55}
+            />
+          }
           showsVerticalScrollIndicator={false}
-          ListFooterComponent={() => <View style={{ height: 80 }} />}
+          ListFooterComponent={
+            <View style={styles.footerSpace} />
+          }
         />
       ) : (
-        <View style={{ marginTop: 50 }}>
+        <View style={styles.skeletonContainer}>
           <FlatList
-            data={["", "", "", ""]}
-            ListHeaderComponent={renderHeaderComponent}
-            renderItem={() => <PostsSkeleton />}
+            data={["", "", ""]}
+            ListHeaderComponent={
+              renderHeaderComponent
+            }
+            renderItem={() => (
+              <PostsSkeleton />
+            )}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="#fff"
+                colors={["#fff"]}
+              />
+            }
             showsVerticalScrollIndicator={false}
           />
         </View>
@@ -75,20 +168,30 @@ export default Home;
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#000",
     flex: 1,
-    paddingTop: 0,
+    backgroundColor: "#000",
   },
-  header: (ContainerHeight) => ({
+
+  header: {
     position: "absolute",
     left: 0,
     right: 0,
-    top: 36,
-    height: ContainerHeight,
-    zIndex: 1,
+    top: 28,
+    height: 52,
+    zIndex: 10,
     backgroundColor: "#000",
-  }),
-  contentContainer: (ContainerHeight) => ({
-    paddingTop: ContainerHeight,
-  }),
+  },
+
+  contentContainer: {
+    paddingTop: 50,
+  },
+
+  skeletonContainer: {
+    flex: 1,
+    paddingTop: 52,
+  },
+
+  footerSpace: {
+    height: 45,
+  },
 });

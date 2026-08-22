@@ -10,7 +10,7 @@ import {
 import { db } from "../services/firebase";
 
 const normalizePost = (post) => {
-  const data = post.data();
+  const data = post.data() || {};
 
   return {
     id: post.id,
@@ -34,7 +34,9 @@ const useFetchUserPosts = (email) => {
   useEffect(() => {
     if (!email) {
       setPosts([]);
-      return;
+      setOnSnapshotData([]);
+      setLoader(false);
+      return undefined;
     }
 
     setLoader(true);
@@ -44,25 +46,22 @@ const useFetchUserPosts = (email) => {
       "posts"
     );
 
-    const q = query(
+    const postsQuery = query(
       postsRef,
       orderBy("createdAt", "desc"),
       limit(loadLimit)
     );
 
     const unsubscribe = onSnapshot(
-      q,
+      postsQuery,
       (snapshot) => {
         const data = snapshot.docs.map(normalizePost);
 
-        setPosts(
-          data.length > 0
-            ? data
-            : [{ id: "empty", comments: [], new_likes: [] }]
-        );
-
         setOnSnapshotData(data);
-        setTimeToReplaceData((prev) => prev + 1);
+        setPosts(data);
+        setTimeToReplaceData(
+          (previous) => previous + 1
+        );
         setLoader(false);
       },
       (error) => {
@@ -70,15 +69,20 @@ const useFetchUserPosts = (email) => {
           "useFetchUserPosts error:",
           error
         );
+
+        setPosts([]);
+        setOnSnapshotData([]);
         setLoader(false);
       }
     );
 
-    return () => unsubscribe();
+    return unsubscribe;
   }, [email, loadLimit]);
 
   const fetchOlderPosts = () => {
-    setLoadLimit((prev) => prev + 10);
+    setLoadLimit(
+      (previous) => previous + 10
+    );
   };
 
   const refreshPosts = () => {

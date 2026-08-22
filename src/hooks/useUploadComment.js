@@ -6,6 +6,8 @@ import {
   arrayUnion,
   Timestamp,
   increment,
+  collection,
+  addDoc,
 } from "firebase/firestore";
 import { db } from "../services/firebase";
 
@@ -13,40 +15,91 @@ const useUploadComment = (post, currentUser) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const uploadComment = async (value) => {
-    if (!isLoading) {
-      setIsLoading(true);
-      try {
-        const postRef = doc(db, "users", post.owner_email, "posts", post.id);
-        const snapshot = await getDoc(postRef);
+    if (isLoading) return false;
 
-        if (snapshot.exists()) {
-          const newComment = {
-            email: currentUser.email,
-            profile_picture: currentUser.profile_picture,
-            username: currentUser.username,
-            comment: value,
-            createdAt: Timestamp.now(),
-            likes_by_users: [],
-          };
+    const commentText = String(value || "").trim();
 
-          await updateDoc(postRef, {
-            comments: arrayUnion(newComment),
-          });
+    if (
+      !commentText ||
+      !post?.owner_email ||
+      !post?.id ||
+      !currentUser?.email
+    ) {
+      return false;
+    }
 
-          if (post.owner_email !== currentUser.email) {
-            const ownerRef = doc(db, "users", post.owner_email);
-            await updateDoc(ownerRef, {
-              event_notification: increment(1),
-            });
-          }
-        } else {
-          console.log("No such document!");
-        }
-      } catch (error) {
-        console.log(error);
-      } finally {
-        setIsLoading(false);
+    setIsLoading(true);
+
+    try {
+      const postRef = doc(
+        db,
+        "users",
+        post.owner_email,
+        "posts",
+        post.id
+      );
+
+      const snapshot = await getDoc(postRef);
+
+      if (!snapshot.exists()) {
+        console.log("No such post document!");
+        return false;
       }
+
+      const createdAt = Timestamp.now();
+
+      const newComment = {
+        email: currentUser.email,
+        profile_picture: currentUser.profile_picture || "",
+        username: currentUser.username || "",
+        comment: commentText,
+        createdAt,
+        likes_by_users: [],
+      };
+
+      await updateDoc(postRef, {
+        comments: arrayUnion(newComment),
+      });
+
+      if (post.owner_email !== currentUser.email) {
+        const ownerRef = doc(
+          db,
+          "users",
+          post.owner_email
+        );
+
+        await addDoc(
+          collection(
+            db,
+            "users",
+            post.owner_email,
+            "notifications"
+          ),
+          {
+            type: "comment",
+            actorEmail: currentUser.email,
+            actorUsername: currentUser.username || "",
+            actorProfilePicture:
+              currentUser.profile_picture || "",
+            postId: post.id,
+            postOwnerEmail: post.owner_email,
+            postImage: post.imageUrl || "",
+            comment: commentText,
+            createdAt,
+          }
+        );
+
+        await updateDoc(ownerRef, {
+          event_notification: increment(1),
+        });
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Comment upload error:", error);
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -5,10 +5,17 @@ import {
   Text,
   FlatList,
   Platform,
+  RefreshControl,
 } from "react-native";
-import { useState, useRef } from "react";
+import {
+  useRef,
+  useState,
+} from "react";
 import { SIZES } from "../constants";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import {
+  Ionicons,
+  MaterialIcons,
+} from "@expo/vector-icons";
 import useFetchReels from "../hooks/useFetchReels";
 import Skeleton from "../components/reels/Skeleton";
 import Reel from "../components/reels/Reel";
@@ -20,37 +27,78 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const Reels = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const flatListRef = useRef(null);
-  const { videos } = useFetchReels();
-  const [messageModalVisible, setMessageModalVisible] = useState(false);
-  const [playingIndexes, setPlayingIndexes] = useState({ 0: true });
+
+  const {
+    videos = [],
+    refreshReels,
+    isLoading,
+  } = useFetchReels();
+
+  const [
+    messageModalVisible,
+    setMessageModalVisible,
+  ] = useState(false);
+
+  const [
+    playingIndexes,
+    setPlayingIndexes,
+  ] = useState({ 0: true });
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const handleRefresh = () => {
+    if (refreshing) return;
+
+    setRefreshing(true);
+
+    refreshReels();
+
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 700);
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <TouchableOpacity
-          onPress={() => handleFeatureNotImplemented(setMessageModalVisible)}
+          onPress={() =>
+            handleFeatureNotImplemented(
+              setMessageModalVisible
+            )
+          }
           style={styles.titleContainer}
         >
-          <Text style={styles.titleText}>Reels</Text>
+          <Text style={styles.titleText}>
+            Reels
+          </Text>
+
           <MaterialIcons
             name="keyboard-arrow-down"
-            size={22}
+            size={19}
             color="#fff"
-            style={{ marginTop: 6 }}
           />
         </TouchableOpacity>
+
         <TouchableOpacity
-          onPress={() => {
-            navigation.navigate("MediaLibrary", {
-              initialSelectedType: "New reel",
-            });
-          }}
+          onPress={() =>
+            navigation.navigate(
+              "MediaLibrary",
+              {
+                initialSelectedType:
+                  "New reel",
+              }
+            )
+          }
+          hitSlop={10}
         >
           <Ionicons
             name="camera-outline"
-            size={32}
+            size={27}
             color="#fff"
-            style={{ marginTop: 6 }}
           />
         </TouchableOpacity>
       </View>
@@ -62,38 +110,82 @@ const Reels = ({ navigation }) => {
           renderItem={({ item }) => (
             <Reel
               item={item}
-              playingIndexes={playingIndexes}
+              playingIndexes={
+                playingIndexes
+              }
               index={item?.index}
               navigation={navigation}
-              setMessageModalVisible={setMessageModalVisible}
-              handleFeatureNotImplemented={handleFeatureNotImplemented}
+              setMessageModalVisible={
+                setMessageModalVisible
+              }
+              handleFeatureNotImplemented={
+                handleFeatureNotImplemented
+              }
             />
           )}
-          keyExtractor={(item) => item.id.toString()}
-          initialNumToRender={3}
-          maxToRenderPerBatch={3}
-          windowSize={5}
-          pagingEnabled={true}
+          keyExtractor={(item, index) =>
+            item?.id?.toString() ||
+            index.toString()
+          }
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          windowSize={4}
+          pagingEnabled
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={
+                refreshing || isLoading
+              }
+              onRefresh={handleRefresh}
+              tintColor="#fff"
+              colors={["#fff"]}
+            />
+          }
           onMomentumScrollEnd={(event) => {
-            const newIndex = Math.round(
-              event.nativeEvent.contentOffset.y /
-                event.nativeEvent.layoutMeasurement.height
-            );
-            setPlayingIndexes({ [newIndex]: true });
+            const height =
+              event.nativeEvent
+                .layoutMeasurement
+                .height;
+
+            if (!height) return;
+
+            const newIndex =
+              Math.round(
+                event.nativeEvent
+                  .contentOffset.y /
+                  height
+              );
+
+            setPlayingIndexes({
+              [newIndex]: true,
+            });
           }}
         />
       ) : (
-        <View style={{ flex: 1, marginTop: 0 }}>
+        <View style={styles.skeleton}>
           <Skeleton />
         </View>
       )}
 
       <MessageModal
-        messageModalVisible={messageModalVisible}
-        message={"This feature is not yet implemented."}
+        messageModalVisible={
+          messageModalVisible
+        }
+        setMessageModalVisible={
+          setMessageModalVisible
+        }
+        message={
+          "This feature is not yet implemented."
+        }
         height={20}
       />
-      <View style={{ height: insets.bottom }} />
+
+      <View
+        style={{
+          height: insets.bottom,
+        }}
+      />
     </View>
   );
 };
@@ -102,29 +194,37 @@ export default Reels;
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     backgroundColor: "#000",
-    width: SIZES.Width,
-    height: Platform.OS === "ios" ? SIZES.Height * 0.913 : SIZES.Height * 0.987,
   },
+
   headerContainer: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 30 : 30,
+    top:
+      Platform.OS === "android"
+        ? 31
+        : 27,
     left: 0,
     right: 0,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginHorizontal: 20,
-    marginTop: 15,
-    zIndex: 1,
+    marginHorizontal: 16,
+    zIndex: 10,
   },
+
   titleContainer: {
     flexDirection: "row",
     alignItems: "center",
   },
+
   titleText: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 23,
+    fontSize: 20,
+  },
+
+  skeleton: {
+    flex: 1,
   },
 });

@@ -4,11 +4,17 @@ import {
   View,
   TouchableOpacity,
   Platform,
-  Alert,
+  ActivityIndicator,
 } from "react-native";
-import { useState, useRef, useEffect } from "react";
-import Animated, { FadeIn, FadeOut, ZoomInDown } from "react-native-reanimated";
-import { SIZES } from "../constants";
+import {
+  useEffect,
+  useState,
+} from "react";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  ZoomInDown,
+} from "react-native-reanimated";
 import {
   MaterialIcons,
   Ionicons,
@@ -16,184 +22,301 @@ import {
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import { useUserContext } from "../contexts/UserContext";
-import useUploadStory from "../hooks/useUploadStory";
-import useResizePictures from "../hooks/useResizePictures";
-import { Image } from "expo-image";
-import { Video, ResizeMode } from "expo-video";
-import MessageModal, {
-  handleFeatureNotImplemented,
-} from "../components/shared/modals/MessageModal";
+import {
+  useVideoPlayer,
+  VideoView,
+} from "expo-video";
+import useUploadReel from "../hooks/useUploadReel";
+import MessageModal from "../components/shared/modals/MessageModal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const NewReel = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const { selectedImage } = route.params || {};
-  const { uploadStory, loader } = useUploadStory();
-  const { resizeStoryPicture } = useResizePictures();
-  const { currentUser } = useUserContext();
 
-  const [opacity, setOpacity] = useState(0);
-  const video = useRef(null);
-  const [status, setStatus] = useState({});
-  const [messageModalVisible, setMessageModalVisible] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const selectedImage =
+    route?.params?.selectedImage;
+
+  const videoUri =
+    typeof selectedImage === "string"
+      ? selectedImage
+      : selectedImage?.uri || "";
+
+  const videoMimeType =
+    typeof selectedImage === "object"
+      ? selectedImage?.mimeType || "video/mp4"
+      : "video/mp4";
+
+  const { currentUser } =
+    useUserContext();
+
+  const {
+    uploadReel,
+    loader,
+  } = useUploadReel();
+
+  const [opacity, setOpacity] =
+    useState(0);
+
+  const [
+    messageModalVisible,
+    setMessageModalVisible,
+  ] = useState(false);
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState("");
+
+  const [
+    isPlaying,
+    setIsPlaying,
+  ] = useState(false);
+
+  const player = useVideoPlayer(
+    videoUri || null,
+    (videoPlayer) => {
+      videoPlayer.loop = true;
+      videoPlayer.muted = false;
+    }
+  );
 
   useEffect(() => {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setOpacity(1);
-    }, 400);
+    }, 250);
+
+    return () => clearTimeout(timer);
   }, []);
 
-  const handleSubmitButton = async () => {
-    Alert.alert(
-      "Upload not allowed",
-      "We apologize, but the upload was deactivated due to server storage limitations."
-    );
-  };
+  useEffect(() => {
+    if (!player) return;
+
+    const subscription =
+      player.addListener(
+        "playingChange",
+        ({ isPlaying: playing }) => {
+          setIsPlaying(playing);
+        }
+      );
+
+    return () => subscription.remove();
+  }, [player]);
 
   const handlePlayPause = () => {
-    if (isPlaying) {
-      video.current.pauseAsync();
-    } else {
-      video.current.playAsync();
+    if (!player || !videoUri) {
+      return;
     }
-    setIsPlaying(!isPlaying);
+
+    if (player.playing) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  };
+
+  const handleSubmitButton = async () => {
+    if (loader || !videoUri) {
+      return;
+    }
+
+    try {
+      const success = await uploadReel(
+        videoUri,
+        currentUser,
+        videoMimeType
+      );
+
+      if (!success) {
+        setErrorMessage(
+          "Reel upload failed. Please try again."
+        );
+        setMessageModalVisible(true);
+        return;
+      }
+
+      navigation.navigate("Main Screen");
+    } catch (error) {
+      console.error(
+        "NewReel submit error:",
+        error
+      );
+
+      setErrorMessage(
+        error?.message ||
+          "Reel upload failed. Please try again."
+      );
+      setMessageModalVisible(true);
+    }
   };
 
   return (
-    <View style={[styles.container, { opacity: opacity }]}>
-      <View style={styles.imageContainer}>
+    <View
+      style={[
+        styles.container,
+        { opacity },
+      ]}
+    >
+      <View style={styles.videoContainer}>
         <Animated.View
           style={styles.topButtonsContainer}
-          entering={ZoomInDown.duration(550)}
+          entering={ZoomInDown.duration(450)}
         >
           <TouchableOpacity
             onPress={() => navigation.goBack()}
+            disabled={loader}
             style={styles.backButtonContainer}
           >
             <MaterialIcons
               name="arrow-back-ios"
-              size={24}
-              color={"#fff"}
+              size={21}
+              color="#fff"
               style={styles.buttonIcon}
             />
           </TouchableOpacity>
+
           <View style={styles.modButtonsContainer}>
             <TouchableOpacity
-              onPress={() =>
-                handleFeatureNotImplemented(setMessageModalVisible)
-              }
               style={styles.modButtonContainer}
             >
-              <Feather name="volume-2" size={28} color={"#fff"} />
+              <Feather
+                name="volume-2"
+                size={24}
+                color="#fff"
+              />
             </TouchableOpacity>
+
             <TouchableOpacity
-              onPress={() =>
-                handleFeatureNotImplemented(setMessageModalVisible)
-              }
               style={styles.modButtonContainer}
             >
-              <Text style={styles.modButtonText}>Aa</Text>
+              <Text style={styles.modButtonText}>
+                Aa
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
-              onPress={() =>
-                handleFeatureNotImplemented(setMessageModalVisible)
-              }
               style={styles.modButtonContainer}
             >
               <MaterialCommunityIcons
                 name="sticker-emoji"
-                size={27}
-                color={"#fff"}
+                size={23}
+                color="#fff"
               />
             </TouchableOpacity>
+
             <TouchableOpacity
-              onPress={() =>
-                handleFeatureNotImplemented(setMessageModalVisible)
-              }
               style={styles.modButtonContainer}
             >
               <MaterialCommunityIcons
                 name="dots-horizontal"
-                size={27}
-                color={"#fff"}
+                size={23}
+                color="#fff"
               />
             </TouchableOpacity>
           </View>
         </Animated.View>
 
-        {Platform.OS === "ios" ? (
-          <Animated.Image
-            source={{ uri: selectedImage.uri }}
-            style={styles.image}
+        {videoUri ? (
+          <VideoView
+            player={player}
+            style={styles.video}
+            contentFit="cover"
+            nativeControls={false}
           />
         ) : (
-          <Animated.Image
-            source={{ uri: selectedImage.uri }}
-            style={styles.image}
-          />
+          <View style={styles.videoPlaceholder}>
+            <Text style={styles.placeholderText}>
+              No video selected
+            </Text>
+          </View>
         )}
-        <Video
-          ref={video}
-          style={styles.video}
-          source={{
-            uri: selectedImage.uri,
-          }}
-          resizeMode={ResizeMode.COVER}
-          isLooping
-          isMuted={false}
-          onPlaybackStatusUpdate={(status) => setStatus(() => status)}
-        />
+
         <TouchableOpacity
           onPress={handlePlayPause}
           style={styles.playButtonContainer}
+          activeOpacity={0.9}
         >
           {!isPlaying && (
             <Animated.View
-              entering={FadeIn.duration(1000)}
-              exiting={FadeOut.duration(1000)}
+              entering={FadeIn.duration(250)}
+              exiting={FadeOut.duration(200)}
             >
-              <Ionicons name="ios-play" size={50} color="white" />
+              <Ionicons
+                name="play"
+                size={44}
+                color="#fff"
+              />
             </Animated.View>
           )}
         </TouchableOpacity>
       </View>
+
       <Animated.View
         style={styles.bottomButtonsContainer}
-        entering={FadeIn.duration(1000)}
+        entering={FadeIn.duration(500)}
       >
-        <TouchableOpacity
-          onPress={() => handleFeatureNotImplemented(setMessageModalVisible)}
-          style={styles.userContainer}
-        >
-          <Image
-            source={{ uri: currentUser.profile_picture }}
-            style={styles.userImage}
-          />
-          <Text style={styles.userText}>Your story</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => handleFeatureNotImplemented(setMessageModalVisible)}
-          style={styles.userContainer}
-        >
-          <View style={styles.iconBorder}>
-            <MaterialIcons name="stars" size={23} color={"#3b3"} />
+        <View style={styles.userContainer}>
+          <View style={styles.profilePlaceholder}>
+            <Text style={styles.profilePlaceholderText}>
+              {currentUser?.username
+                ?.charAt(0)
+                ?.toUpperCase() || "?"}
+            </Text>
           </View>
-          <Text style={styles.userText}>Close Friends</Text>
-        </TouchableOpacity>
+
+          <Text style={styles.userText}>
+            Your reel
+          </Text>
+        </View>
+
+        <View style={styles.userContainer}>
+          <View style={styles.iconBorder}>
+            <MaterialIcons
+              name="stars"
+              size={20}
+              color="#3b3"
+            />
+          </View>
+
+          <Text style={styles.userText}>
+            Close Friends
+          </Text>
+        </View>
+
         <TouchableOpacity
-          onPress={() => handleSubmitButton()}
-          style={styles.nextButtonContainer}
+          onPress={handleSubmitButton}
+          disabled={loader || !videoUri}
+          style={[
+            styles.nextButtonContainer,
+            loader && styles.disabledButton,
+          ]}
         >
-          <Ionicons name="arrow-forward" size={30} color={"#000"} />
+          {loader ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <Ionicons
+              name="arrow-forward"
+              size={26}
+              color="#000"
+            />
+          )}
         </TouchableOpacity>
       </Animated.View>
+
       <MessageModal
         messageModalVisible={messageModalVisible}
-        message={"This feature is not yet implemented."}
+        setMessageModalVisible={setMessageModalVisible}
+        message={
+          errorMessage ||
+          "Reel upload failed."
+        }
         height={80}
       />
-      <View style={{ height: insets.bottom }} />
+
+      <View
+        style={{
+          height: insets.bottom,
+        }}
+      />
     </View>
   );
 };
@@ -202,124 +325,148 @@ export default NewReel;
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: Platform.OS === "ios" ? 50 : 50,
-    backgroundColor: "#000",
     flex: 1,
+    paddingTop:
+      Platform.OS === "ios" ? 45 : 43,
+    backgroundColor: "#000",
   },
+
+  videoContainer: {
+    flex: 1,
+    overflow: "hidden",
+    borderRadius: 22,
+  },
+
   topButtonsContainer: {
     zIndex: 2,
     flexDirection: "row",
     justifyContent: "space-between",
-    position: "relative",
-    marginTop: -50,
-    top: 56,
-    marginHorizontal: 12,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 12,
+    marginHorizontal: 10,
   },
+
   modButtonsContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 4,
   },
+
   modButtonContainer: {
-    height: 44,
-    width: 44,
+    height: 40,
+    width: 40,
     borderRadius: 100,
-    backgroundColor: "#484040",
+    backgroundColor:
+      "rgba(55,55,55,0.82)",
     justifyContent: "center",
     alignItems: "center",
-    opacity: 0.92,
   },
+
   modButtonText: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 18,
-    marginBottom: 8,
-    transform: [{ scaleY: 1.1 }],
+    fontSize: 17,
+    marginBottom: 6,
   },
-  image: {
-    position: "absolute",
-    top: -5,
-    width: "100%",
-    height:
-      Platform.OS === "android" ? SIZES.Height * 0.925 : SIZES.Height * 0.85,
-    resizeMode: "cover",
-    borderRadius: 25,
-    zIndex: -1,
-  },
+
   video: {
     width: "100%",
-    height:
-      Platform.OS === "android" ? SIZES.Height * 0.925 : SIZES.Height * 0.85,
-    borderRadius: 25,
+    height: "100%",
   },
-  backButtonContainer: {
-    height: 45,
-    width: 45,
-    borderRadius: 100,
-    zIndex: 2,
+
+  videoPlaceholder: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#444040",
-    opacity: 0.99,
+    backgroundColor: "#111",
   },
+
+  placeholderText: {
+    color: "#777",
+    fontSize: 14,
+  },
+
+  backButtonContainer: {
+    height: 42,
+    width: 42,
+    borderRadius: 100,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor:
+      "rgba(55,55,55,0.82)",
+  },
+
   buttonIcon: {
-    paddingLeft: 10,
+    paddingLeft: 7,
   },
+
   bottomButtonsContainer: {
-    height: SIZES.Height * 0.08,
-    paddingHorizontal: 15,
+    minHeight: 62,
+    paddingHorizontal: 12,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 8,
+    gap: 7,
   },
+
   userContainer: {
     flex: 1,
-    height: 44,
+    height: 42,
     flexDirection: "row",
     justifyContent: "space-evenly",
     alignItems: "center",
     borderRadius: 30,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     backgroundColor: "#333",
   },
-  userImage: {
-    height: 26,
-    width: 26,
+
+  profilePlaceholder: {
+    height: 24,
+    width: 24,
     borderRadius: 100,
-    borderWidth: 2,
-    borderColor: "#fff",
+    backgroundColor: "#666",
+    alignItems: "center",
+    justifyContent: "center",
   },
+
+  profilePlaceholderText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
   userText: {
     color: "#fff",
     fontWeight: "600",
-    fontSize: 12,
-    marginBottom: 4,
+    fontSize: 11,
   },
+
   nextButtonContainer: {
     backgroundColor: "#fff",
-    height: 45,
-    width: 45,
+    height: 42,
+    width: 42,
     borderRadius: 100,
-    zIndex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
+
+  disabledButton: {
+    opacity: 0.55,
   },
+
   iconBorder: {
     backgroundColor: "#fff",
     borderRadius: 100,
   },
+
   playButtonContainer: {
     position: "absolute",
-    bottom: 0,
+    top: 0,
     right: 0,
+    bottom: 0,
     left: 0,
-    height: "100%",
     zIndex: 1,
     justifyContent: "center",
     alignItems: "center",

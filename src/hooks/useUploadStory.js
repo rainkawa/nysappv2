@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { collection, doc, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import useUploadPicture from "./useUploadPicture";
 import { db } from "../services/firebase";
 
@@ -8,15 +12,27 @@ const useUploadStory = () => {
   const { uploadPicture } = useUploadPicture();
 
   const uploadStory = async (imageUrl, currentUser) => {
-    if (isLoading) return;
+    if (isLoading) return false;
+
+    if (!imageUrl || !currentUser?.email) {
+      console.error("Story upload: missing image or user information.");
+      return false;
+    }
+
     setIsLoading(true);
+
     try {
-      const timestamp = new Date().getTime();
+      const timestamp = Date.now();
+
       const uploadedImageUrl = await uploadPicture(
         imageUrl,
         currentUser.email,
         timestamp
       );
+
+      if (!uploadedImageUrl) {
+        throw new Error("Story image upload failed.");
+      }
 
       const newStory = {
         imageUrl: uploadedImageUrl,
@@ -37,9 +53,13 @@ const useUploadStory = () => {
         currentUser.email,
         "stories"
       );
+
       await addDoc(storiesCollectionRef, newStory);
+
+      return true;
     } catch (error) {
-      console.error(error);
+      console.error("Story upload failed:", error);
+      return false;
     } finally {
       setIsLoading(false);
     }

@@ -1,0 +1,527 @@
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
+import {
+  useEffect,
+  useState,
+} from "react";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  ZoomInDown,
+} from "react-native-reanimated";
+import {
+  MaterialIcons,
+  Ionicons,
+  Feather,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import { useUserContext } from "../contexts/UserContext";
+import {
+  useVideoPlayer,
+  VideoView,
+} from "expo-video";
+import useUploadReel from "../hooks/useUploadReel";
+import MessageModal from "../components/shared/modals/MessageModal";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const NewReel = ({
+  navigation,
+  route,
+}) => {
+  const insets = useSafeAreaInsets();
+
+  const selectedImage =
+    route?.params?.selectedImage;
+
+  const videoUri =
+    typeof selectedImage === "string"
+      ? selectedImage
+      : selectedImage?.uri || "";
+
+   const videoMimeType =
+     typeof selectedImage === "object"
+      ? selectedImage?.mimeType ||
+       "video/mp4"
+      : "video/mp4";
+
+   const success = await uploadReel(
+     videoUri,
+     currentUser,
+     videoMimeType
+   );
+
+  const { currentUser } =
+    useUserContext();
+
+  const {
+    uploadReel,
+    loader,
+  } = useUploadReel();
+
+  const [opacity, setOpacity] =
+    useState(0);
+
+  const [
+    messageModalVisible,
+    setMessageModalVisible,
+  ] = useState(false);
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState("");
+
+  const [
+    isPlaying,
+    setIsPlaying,
+  ] = useState(false);
+
+  const player = useVideoPlayer(
+    videoUri || null,
+    (videoPlayer) => {
+      videoPlayer.loop = true;
+      videoPlayer.muted = false;
+    }
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setOpacity(1),
+      250
+    );
+
+    return () =>
+      clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!player) return;
+
+    const subscription =
+      player.addListener(
+        "playingChange",
+        ({ isPlaying: playing }) => {
+          setIsPlaying(playing);
+        }
+      );
+
+    return () =>
+      subscription.remove();
+  }, [player]);
+
+  const handlePlayPause = () => {
+    if (!player || !videoUri) {
+      return;
+    }
+
+    if (player.playing) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  };
+
+  const handleSubmitButton = async () => {
+    if (loader || !videoUri) {
+      return;
+    }
+
+    const success = await uploadReel(
+      videoUri,
+      currentUser
+    );
+
+    if (!success) {
+      setErrorMessage(
+        "Reel upload failed. Check your internet connection and try again."
+      );
+      setMessageModalVisible(true);
+      return;
+    }
+
+    navigation.navigate("Main Screen");
+  };
+
+  return (
+    <View
+      style={[
+        styles.container,
+        { opacity },
+      ]}
+    >
+      <View style={styles.videoContainer}>
+        <Animated.View
+          style={styles.topButtonsContainer}
+          entering={ZoomInDown.duration(
+            450
+          )}
+        >
+          <TouchableOpacity
+            onPress={() =>
+              navigation.goBack()
+            }
+            disabled={loader}
+            style={
+              styles.backButtonContainer
+            }
+          >
+            <MaterialIcons
+              name="arrow-back-ios"
+              size={21}
+              color="#fff"
+              style={styles.buttonIcon}
+            />
+          </TouchableOpacity>
+
+          <View
+            style={
+              styles.modButtonsContainer
+            }
+          >
+            <TouchableOpacity
+              style={
+                styles.modButtonContainer
+              }
+            >
+              <Feather
+                name="volume-2"
+                size={24}
+                color="#fff"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={
+                styles.modButtonContainer
+              }
+            >
+              <Text
+                style={styles.modButtonText}
+              >
+                Aa
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={
+                styles.modButtonContainer
+              }
+            >
+              <MaterialCommunityIcons
+                name="sticker-emoji"
+                size={23}
+                color="#fff"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={
+                styles.modButtonContainer
+              }
+            >
+              <MaterialCommunityIcons
+                name="dots-horizontal"
+                size={23}
+                color="#fff"
+              />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {videoUri ? (
+          <VideoView
+            player={player}
+            style={styles.video}
+            contentFit="cover"
+            nativeControls={false}
+          />
+        ) : (
+          <View
+            style={styles.videoPlaceholder}
+          >
+            <Text
+              style={
+                styles.placeholderText
+              }
+            >
+              No video selected
+            </Text>
+          </View>
+        )}
+
+        <TouchableOpacity
+          onPress={handlePlayPause}
+          style={
+            styles.playButtonContainer
+          }
+          activeOpacity={0.9}
+        >
+          {!isPlaying && (
+            <Animated.View
+              entering={FadeIn.duration(
+                250
+              )}
+              exiting={FadeOut.duration(
+                200
+              )}
+            >
+              <Ionicons
+                name="play"
+                size={44}
+                color="#fff"
+              />
+            </Animated.View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <Animated.View
+        style={
+          styles.bottomButtonsContainer
+        }
+        entering={FadeIn.duration(500)}
+      >
+        <View style={styles.userContainer}>
+          <View
+            style={
+              styles.profilePlaceholder
+            }
+          >
+            <Text
+              style={
+                styles.profilePlaceholderText
+              }
+            >
+              {currentUser?.username
+                ?.charAt(0)
+                ?.toUpperCase() || "?"}
+            </Text>
+          </View>
+
+          <Text style={styles.userText}>
+            Your reel
+          </Text>
+        </View>
+
+        <View style={styles.userContainer}>
+          <View style={styles.iconBorder}>
+            <MaterialIcons
+              name="stars"
+              size={20}
+              color="#3b3"
+            />
+          </View>
+
+          <Text style={styles.userText}>
+            Close Friends
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={handleSubmitButton}
+          disabled={
+            loader || !videoUri
+          }
+          style={[
+            styles.nextButtonContainer,
+            loader &&
+              styles.disabledButton,
+          ]}
+        >
+          {loader ? (
+            <ActivityIndicator
+              color="#000"
+            />
+          ) : (
+            <Ionicons
+              name="arrow-forward"
+              size={26}
+              color="#000"
+            />
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+
+      <MessageModal
+        messageModalVisible={
+          messageModalVisible
+        }
+        setMessageModalVisible={
+          setMessageModalVisible
+        }
+        message={
+          errorMessage ||
+          "Reel upload failed."
+        }
+        height={80}
+      />
+
+      <View
+        style={{
+          height: insets.bottom,
+        }}
+      />
+    </View>
+  );
+};
+
+export default NewReel;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingTop:
+      Platform.OS === "ios" ? 45 : 43,
+    backgroundColor: "#000",
+  },
+
+  videoContainer: {
+    flex: 1,
+    overflow: "hidden",
+    borderRadius: 22,
+  },
+
+  topButtonsContainer: {
+    zIndex: 2,
+    flexDirection: "row",
+    justifyContent:
+      "space-between",
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 12,
+    marginHorizontal: 10,
+  },
+
+  modButtonsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  modButtonContainer: {
+    height: 40,
+    width: 40,
+    borderRadius: 100,
+    backgroundColor:
+      "rgba(55,55,55,0.82)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 17,
+    marginBottom: 6,
+  },
+
+  video: {
+    width: "100%",
+    height: "100%",
+  },
+
+  videoPlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#111",
+  },
+
+  placeholderText: {
+    color: "#777",
+    fontSize: 14,
+  },
+
+  backButtonContainer: {
+    height: 42,
+    width: 42,
+    borderRadius: 100,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor:
+      "rgba(55,55,55,0.82)",
+  },
+
+  buttonIcon: {
+    paddingLeft: 7,
+  },
+
+  bottomButtonsContainer: {
+    minHeight: 62,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    justifyContent:
+      "space-between",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  userContainer: {
+    flex: 1,
+    height: 42,
+    flexDirection: "row",
+    justifyContent:
+      "space-evenly",
+    alignItems: "center",
+    borderRadius: 30,
+    paddingHorizontal: 8,
+    backgroundColor: "#333",
+  },
+
+  profilePlaceholder: {
+    height: 24,
+    width: 24,
+    borderRadius: 100,
+    backgroundColor: "#666",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  profilePlaceholderText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  userText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 11,
+  },
+
+  nextButtonContainer: {
+    backgroundColor: "#fff",
+    height: 42,
+    width: 42,
+    borderRadius: 100,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  disabledButton: {
+    opacity: 0.55,
+  },
+
+  iconBorder: {
+    backgroundColor: "#fff",
+    borderRadius: 100,
+  },
+
+  playButtonContainer: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});

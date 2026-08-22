@@ -28,7 +28,7 @@ const BottomSheetAddNew = ({ bottomSheetRef, navigation }) => {
           onPress={() => {
             bottomSheetRef.current.close();
             navigation.navigate("MediaLibrary", {
-              initialSelectedType: "New Reel",
+              initialSelectedType: "New reel",
               selectorAvailable: false,
             });
           }}
@@ -46,7 +46,7 @@ const BottomSheetAddNew = ({ bottomSheetRef, navigation }) => {
           onPress={() => {
             bottomSheetRef.current.close();
             navigation.navigate("MediaLibrary", {
-              initialSelectedType: "New Post",
+              initialSelectedType: "New post",
               selectorAvailable: false,
             });
           }}

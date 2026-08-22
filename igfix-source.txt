@@ -1,0 +1,2056 @@
+
+==================== .igfix/Detail.jsx ====================
+import { StyleSheet, View } from "react-native";
+import { FlatList } from "react-native-gesture-handler";
+import { useState, useEffect, useRef } from "react";
+import TitleBar from "../components/shared/TitleBar";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  runOnJS,
+  interpolateColor,
+} from "react-native-reanimated";
+import { GestureDetector, Gesture } from "react-native-gesture-handler";
+import { useUserContext } from "../contexts/UserContext";
+import BottomSheetOptions from "../components/detail/bottomSheets/BottomSheetOptions";
+import BottomSheetComments from "../components/detail/bottomSheets/BottomSheetComments";
+import BottomSheetComment from "../components/detail/bottomSheets/BottomSheetComment";
+import useFetchUserPosts from "../hooks/useFetchUserPosts";
+import RenderItem from "../components/detail/RenderItem";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const Detail = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
+  const { item } = route.params || {};
+  const { currentUser } = useUserContext();
+  const { timeToReplaceData, onSnapshotData } = useFetchUserPosts(
+    item.owner_email
+  );
+
+  const [bottomSheetIndex, setBottomSheetIndex] = useState(0);
+  const [layoutHeight, setLayoutHeight] = useState(0);
+  const bottomSheetRefOptions = useRef(null);
+  const bottomSheetRefComments = useRef(null);
+  const bottomSheetRefComment = useRef(null);
+
+  const [posts, setPosts] = useState([item]);
+
+  useEffect(() => {
+    if (timeToReplaceData > 0) {
+      const moveItemToStart = (arr) => {
+        const index = arr.findIndex((post) => item.id === post.id);
+        if (index !== -1 || index !== 0) {
+          const itemToMove = arr.splice(index, 1)[0];
+          arr.unshift(itemToMove);
+          setPosts(arr);
+        } else {
+          setPosts(arr);
+        }
+      };
+      moveItemToStart(onSnapshotData);
+    }
+  }, [timeToReplaceData]);
+
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const opacity = useSharedValue(1);
+  const scale = useSharedValue(1);
+
+  const gesture = Gesture.Pan()
+    .onUpdate((value) => {
+      translateX.value = value.translationX * 0.8;
+      translateY.value = value.translationY * 0.8;
+      const distance = Math.sqrt(
+        value.translationX * value.translationX +
+          value.translationY * value.translationY
+      );
+      const scaleValue = Math.min(Math.max(distance / 100, 1), 0.9);
+      scale.value = withTiming(scaleValue, { duration: 100 });
+    })
+    .onEnd(() => {
+      if (translateY.value > 75) {
+        opacity.value = 0;
+        runOnJS(navigation.goBack)();
+      } else {
+        translateX.value = withTiming(0, { duration: 300 });
+        translateY.value = withTiming(0, { duration: 300 });
+        scale.value = withTiming(1, { duration: 300 });
+      }
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+    backgroundColor: interpolateColor(
+      opacity.value,
+      [0, 1],
+      ["transparent", "#000"]
+    ),
+    borderRadius: 20,
+    overflow: "hidden",
+  }));
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <Animated.View style={[styles.container, animatedStyle]}>
+        <TitleBar navigation={navigation} name="Detail" activity={false} />
+        <FlatList
+          data={posts}
+          snapToInterval={layoutHeight - 10}
+          snapToAlignment={"start"}
+          decelerationRate={"fast"}
+          renderItem={({ item, index }) => (
+            <RenderItem
+              navigation={navigation}
+              post={item}
+              currentUser={currentUser}
+              bottomSheetRefComments={bottomSheetRefComments}
+              bottomSheetRefComment={bottomSheetRefComment}
+              bottomSheetRefOptions={bottomSheetRefOptions}
+              setBottomSheetIndex={setBottomSheetIndex}
+              sharedIndex={index}
+              setLayoutHeight={setLayoutHeight}
+            />
+          )}
+          ListFooterComponent={() => <View style={{ height: 100 }} />}
+          keyExtractor={(item) => item.id.toString()}
+          showsVerticalScrollIndicator={false}
+        />
+        <View
+          style={{
+            height: insets.bottom,
+          }}
+        />
+        <BottomSheetOptions
+          bottomSheetRef={bottomSheetRefOptions}
+          navigation={navigation}
+          post={posts[bottomSheetIndex]}
+          currentUser={currentUser}
+        />
+        <BottomSheetComments
+          bottomSheetRef={bottomSheetRefComments}
+          post={posts[bottomSheetIndex]}
+          currentUser={currentUser}
+          navigation={navigation}
+        />
+        <BottomSheetComment
+          bottomSheetRefComment={bottomSheetRefComment}
+          post={posts[bottomSheetIndex]}
+          currentUser={currentUser}
+        />
+      </Animated.View>
+    </GestureDetector>
+  );
+};
+
+export default Detail;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    paddingTop: 44,
+  },
+});
+
+==================== .igfix/Follow.jsx ====================
+import {
+  StyleSheet,
+  Text,
+  View,
+  Animated,
+  FlatList,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from "react-native";
+import { useState } from "react";
+import TitleBar from "../components/shared/TitleBar";
+import SearchBar from "../components/shared/SearchBar";
+import Followers from "../components/follow/Followers";
+import Requests from "../components/follow/Requests";
+import Following from "../components/follow/Following";
+import useFetchRequests from "../hooks/useFetchRequests";
+import useFetchFollowers from "../hooks/useFetchFollowers";
+import useFetchFollowing from "../hooks/useFetchFollowing";
+import useTabSlideAnimation from "../utils/useTabSlideAnimation";
+import { useUserContext } from "../contexts/UserContext";
+import { SIZES } from "../constants";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const Follow = ({ navigation }) => {
+  const { currentUser } = useUserContext();
+
+  const [onSearch, setOnSearch] = useState(false);
+  const [resetSearchBar, setResetSearchBar] = useState(0);
+  const [filteredFollowers, setFilteredFollowers] = useState({});
+  const [filteredFollowing, setFilteredFollowing] = useState({});
+
+  const { requests } = useFetchRequests({ user: currentUser });
+  const { followers } = useFetchFollowers({ user: currentUser });
+  const { following } = useFetchFollowing({ user: currentUser });
+  const { handleTabChange, translation, activeButton } = useTabSlideAnimation();
+
+  const childPropChange = (searchKey) => {
+    searchKey !== "" ? setOnSearch(true) : setOnSearch(false);
+    if (activeButton === 0) {
+      if (followers.length > 0) {
+        const filteredData = followers.filter(
+          (follower) =>
+            follower.username.includes(searchKey) ||
+            follower.name.toLowerCase().includes(searchKey) ||
+            follower.email.includes(searchKey)
+        );
+        setFilteredFollowers(filteredData);
+      }
+    } else {
+      if (following.length > 0) {
+        const filteredData = following.filter(
+          (follow) =>
+            follow.username.includes(searchKey) ||
+            follow.name.toLowerCase().includes(searchKey) ||
+            follow.email.includes(searchKey)
+        );
+        setFilteredFollowing(filteredData);
+      }
+    }
+  };
+
+  return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} disabled>
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+        <TitleBar navigation={navigation} name={currentUser.username} />
+        <View style={styles.rowContainer}>
+          <TouchableOpacity>
+            <Text
+              onPress={() => {
+                setResetSearchBar(resetSearchBar + 1);
+                handleTabChange(0);
+              }}
+              style={styles.textTitle}
+            >
+              {currentUser.followers.length > 0
+                ? currentUser.followers.length + "  Followers"
+                : "Followers"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity>
+            <Text
+              onPress={() => {
+                setResetSearchBar(resetSearchBar + 1);
+                handleTabChange(1);
+              }}
+              style={styles.textTitle}
+            >
+              {currentUser.following.length > 0
+                ? currentUser.following.length + "  Following"
+                : "Following"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity>
+            <Text
+              onPress={() => {
+                setResetSearchBar(resetSearchBar + 1);
+                handleTabChange(2);
+              }}
+              style={styles.textTitle}
+            >
+              {currentUser.followers_request.length > 0
+                ? currentUser.followers_request.length + "  Requests"
+                : "Requests"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.lineContainer}>
+          <View
+            style={
+              activeButton === 0 ? styles.highlightedOn : styles.highlightedOff
+            }
+          />
+          <View
+            style={
+              activeButton === 1 ? styles.highlightedOn : styles.highlightedOff
+            }
+          />
+          <View
+            style={
+              activeButton === 2 ? styles.highlightedOn : styles.highlightedOff
+            }
+          />
+        </View>
+
+        <Animated.View
+          style={[
+            styles.flatListContainer,
+            { transform: [{ translateX: translation }] },
+          ]}
+        >
+          <FlatList
+            ListHeaderComponent={
+              <SearchBar
+                onPropChange={childPropChange}
+                resetSearchBar={resetSearchBar}
+              />
+            }
+            style={{ width: SIZES.Width }}
+            data={onSearch ? filteredFollowers : followers}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <Followers
+                user={item}
+                currentUser={currentUser}
+                navigation={navigation}
+              />
+            )}
+          />
+
+          <FlatList
+            ListHeaderComponent={
+              <SearchBar
+                onPropChange={childPropChange}
+                resetSearchBar={resetSearchBar}
+              />
+            }
+            style={{ width: SIZES.Width }}
+            data={onSearch ? filteredFollowing : following}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <Following
+                user={item}
+                currentUser={currentUser}
+                navigation={navigation}
+              />
+            )}
+          />
+
+          <FlatList
+            ListHeaderComponent={
+              <Text style={styles.requestsText}>
+                {requests.length > 0
+                  ? "They want to start following you:"
+                  : "No requests for now."}
+              </Text>
+            }
+            style={{ width: SIZES.Width }}
+            data={requests}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <Requests
+                user={item}
+                currentUser={currentUser}
+                navigation={navigation}
+              />
+            )}
+          />
+        </Animated.View>
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
+  );
+};
+
+export default Follow;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    paddingTop: 0,
+  },
+  rowContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginHorizontal: 15,
+    marginTop: 10,
+  },
+  textTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  lineContainer: {
+    flexDirection: "row",
+    marginTop: 14,
+  },
+  highlightedOff: {
+    flex: 1,
+    backgroundColor: "#222",
+    height: 1,
+  },
+  highlightedOn: {
+    flex: 1,
+    backgroundColor: "#ccc",
+    height: 1,
+  },
+  flatListContainer: {
+    flex: 1,
+    flexDirection: "row",
+    width: "300%",
+  },
+  requestsText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+    marginTop: 15,
+    marginHorizontal: 20,
+  },
+});
+
+==================== .igfix/Following.jsx ====================
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  FlatList,
+  Platform,
+} from "react-native";
+import { MaterialIcons, AntDesign, FontAwesome } from "@expo/vector-icons";
+import { useUserContext } from "../contexts/UserContext";
+import useFilterPosts from "../hooks/useFilterPosts";
+import Posts from "../components/home/Posts";
+import PostsSkeleton from "../components/home/skeletons/PostsSkeleton";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const Following = ({ navigation }) => {
+  const { currentUser } = useUserContext();
+  const { filteredPosts, isLoading, fetchOlderPosts, refreshPosts } =
+    useFilterPosts(currentUser.following);
+
+  const renderPostItem = ({ item }) => (
+    <Posts navigation={navigation} post={item} currentUser={currentUser} />
+  );
+
+  const ListFooterComponent = () => {
+    return (
+      <View style={styles.footerContainer}>
+        <LinearGradient
+          start={[0.9, 0.45]}
+          end={[0.07, 1.03]}
+          colors={["#ff00ff", "#ff4400", "#ffff00"]}
+          style={styles.rainbowBorder}
+        >
+          <AntDesign name="checkcircle" size={58} color={"#000"} />
+        </LinearGradient>
+        <Text style={styles.title}>End of following</Text>
+        <Text style={styles.text}>
+          There are no more posts from accounts you follow from the past 30
+          days.
+        </Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.button}>Back to home</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <TouchableOpacity
+        style={styles.titleContainer}
+        onPress={() => navigation.goBack()}
+      >
+        <MaterialIcons name="arrow-back-ios" size={28} color={"#fff"} />
+        <Text style={styles.textTitle}>Following</Text>
+      </TouchableOpacity>
+      <View style={styles.divider} />
+
+      {filteredPosts[0]?.id === "empty" ? (
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIcon}>
+            <FontAwesome name="star-o" size={64} color={"#fff"} />
+          </View>
+          <Text style={styles.emptyTitle}>
+            Choose the accounts you can't miss out on
+          </Text>
+          <Text style={styles.emptyText}>
+            Begin following people to see their posts here, starting with the
+            most recent posts.
+          </Text>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.emptyButton}>Back to home</Text>
+          </TouchableOpacity>
+        </View>
+      ) : filteredPosts.length > 0 ? (
+        <FlatList
+          data={filteredPosts}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={renderPostItem}
+          scrollEventThrottle={16}
+          onEndReached={() => fetchOlderPosts()}
+          onEndReachedThreshold={1}
+          initialNumToRender={10}
+          onRefresh={() => refreshPosts()}
+          refreshing={isLoading}
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={ListFooterComponent}
+          windowSize={10}
+        />
+      ) : (
+        <View style={{ marginTop: 50 }}>
+          <FlatList
+            data={["", "", "", ""]}
+            renderItem={() => <PostsSkeleton />}
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
+      )}
+    </SafeAreaView>
+  );
+};
+
+export default Following;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    paddingTop: 0,
+  },
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    marginHorizontal: 20,
+    marginTop: Platform.OS === "android" ? 9 : 0,
+    marginBottom: Platform.OS === "android" ? 14 : 10,
+  },
+  textTitle: {
+    marginTop: 5,
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  divider: {
+    height: 0.5,
+    width: "100%",
+    backgroundColor: "#333",
+  },
+  footerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 12,
+    marginTop: 20,
+    marginBottom: 60,
+    gap: 10,
+  },
+  rainbowBorder: {
+    padding: 3,
+    height: 63.5,
+    width: 63.5,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 100,
+  },
+  title: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  text: {
+    color: "#fff",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  button: {
+    color: "#09f",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  emptyContainer: {
+    height: "75%",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 24,
+    marginTop: 20,
+    marginBottom: 60,
+    gap: 15,
+  },
+  emptyIcon: {
+    borderWidth: 4,
+    borderColor: "#fff",
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 94,
+    width: 94,
+  },
+  emptyTitle: {
+    textAlign: "center",
+    color: "#fff",
+    fontSize: 28,
+    fontWeight: "700",
+  },
+  emptyText: {
+    textAlign: "center",
+    color: "#fff",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  emptyButton: {
+    color: "#09f",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+});
+
+==================== .igfix/Interaction.jsx ====================
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Platform,
+} from "react-native";
+import { Image } from "expo-image";
+import useCheckStoriesSeen from "../../hooks/useCheckStoriesSeen";
+import { LinearGradient } from "expo-linear-gradient";
+
+const Interaction = ({ navigation, item, currentUser, text }) => {
+  const { checkStoriesSeen } = useCheckStoriesSeen();
+
+  const comments = Array.isArray(item?.comments)
+    ? item.comments
+    : [];
+
+  const newLikes = Array.isArray(item?.new_likes)
+    ? item.new_likes
+    : [];
+
+  const lastComment =
+    comments.length > 0
+      ? comments[comments.length - 1]
+      : null;
+
+  const handleUserProfile = () => {
+    navigation.navigate("UserDetail", {
+      email: lastComment?.email,
+    });
+  };
+
+  const handleCheckPost = () => {
+    navigation.navigate("Detail", { item: item });
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.rowContainer}>
+        <TouchableOpacity onPress={() => handleUserProfile()}>
+          {text === "commented" &&
+          lastComment?.email &&
+          checkStoriesSeen(lastComment.email, currentUser.email) ? (
+            <LinearGradient
+              start={[0.9, 0.45]}
+              end={[0.07, 1.03]}
+              colors={["#ff00ff", "#ff4400", "#ffff00"]}
+              style={styles.rainbowBorder}
+            >
+              <Image
+                source={{
+                  uri:
+                    text === "commented"
+                      ? lastComment?.profile_picture || ""
+                      : newLikes[1] || "",
+                }}
+                style={styles.image}
+              />
+            </LinearGradient>
+          ) : (
+            <Image
+              source={{
+                uri:
+                  text === "commented"
+                    ? lastComment?.profile_picture || ""
+                    : newLikes[1] || "",
+              }}
+              style={styles.nonRainbowImage}
+            />
+          )}
+        </TouchableOpacity>
+        <View style={styles.userContainer}>
+          <TouchableOpacity onPress={() => handleUserProfile()}>
+            <Text style={styles.username}>
+              {text === "commented"
+                ? lastComment?.username || "Someone"
+                : newLikes[0] || "Someone"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleCheckPost()}>
+            <Text style={styles.name}>
+              {text === "commented"
+                ? "Commented your post."
+                : "Liked your post."}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity onPress={() => handleCheckPost()}>
+          <Image source={{ uri: item.imageUrl }} style={styles.postImage} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+export default Interaction;
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 12,
+    marginTop: Platform.OS === "android" ? 15 : 8,
+  },
+  rowContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  rainbowBorder: {
+    borderRadius: 100,
+    height: 58,
+    width: 58,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  image: {
+    height: 56,
+    width: 56,
+    borderRadius: 100,
+    borderWidth: 2.5,
+    borderColor: "#000",
+  },
+  nonRainbowImage: {
+    height: 58,
+    width: 58,
+    borderWidth: 3,
+    borderColor: "#000",
+    borderRadius: 100,
+  },
+  userContainer: {
+    justifyContent: "center",
+    marginLeft: 15,
+  },
+  username: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  name: {
+    color: "#ddd",
+    fontSize: 13,
+    fontWeight: "400",
+  },
+  postImage: {
+    height: 60,
+    width: 60,
+    marginRight: 2,
+  },
+});
+
+==================== .igfix/NewStory.jsx ====================
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
+import { useState, useEffect } from "react";
+import Animated, { FadeIn, ZoomInDown } from "react-native-reanimated";
+import { SIZES } from "../constants";
+import {
+  MaterialIcons,
+  Ionicons,
+  Feather,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import { useUserContext } from "../contexts/UserContext";
+import useUploadStory from "../hooks/useUploadStory";
+import useResizePictures from "../hooks/useResizePictures";
+import { Image } from "expo-image";
+import MessageModal, {
+  handleFeatureNotImplemented,
+} from "../components/shared/modals/MessageModal";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const NewStory = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
+  const { selectedImage } = route.params || {};
+  const { uploadStory, isLoading } = useUploadStory();
+  const { resizeStoryPicture } = useResizePictures();
+  const { currentUser } = useUserContext();
+  const [opacity, setOpacity] = useState(0);
+  const [messageModalVisible, setMessageModalVisible] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setOpacity(1);
+    }, 400);
+  }, []);
+
+  const handleSubmitButton = async () => {
+    const resizedImage = await resizeStoryPicture(selectedImage.uri);
+    await uploadStory(resizedImage.uri, currentUser);
+    navigation.navigate("Main Screen");
+  };
+
+  return (
+    <View style={[styles.container, { opacity: opacity }]}>
+      <View style={styles.imageContainer}>
+        <Animated.View
+          style={styles.topButtonsContainer}
+          entering={ZoomInDown.duration(550)}
+        >
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButtonContainer}
+          >
+            <MaterialIcons
+              name="arrow-back-ios"
+              size={24}
+              color={"#fff"}
+              style={styles.buttonIcon}
+            />
+          </TouchableOpacity>
+          <View style={styles.modButtonsContainer}>
+            <TouchableOpacity
+              onPress={() =>
+                handleFeatureNotImplemented(setMessageModalVisible)
+              }
+              style={styles.modButtonContainer}
+            >
+              <Feather name="volume-2" size={28} color={"#fff"} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                handleFeatureNotImplemented(setMessageModalVisible)
+              }
+              style={styles.modButtonContainer}
+            >
+              <Text style={styles.modButtonText}>Aa</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                handleFeatureNotImplemented(setMessageModalVisible)
+              }
+              style={styles.modButtonContainer}
+            >
+              <MaterialCommunityIcons
+                name="sticker-emoji"
+                size={27}
+                color={"#fff"}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                handleFeatureNotImplemented(setMessageModalVisible)
+              }
+              style={styles.modButtonContainer}
+            >
+              <MaterialCommunityIcons
+                name="dots-horizontal"
+                size={27}
+                color={"#fff"}
+              />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        <Image source={{ uri: selectedImage.uri }} style={styles.image} />
+      </View>
+      <Animated.View
+        style={styles.bottomButtonsContainer}
+        entering={FadeIn.duration(1000)}
+      >
+        <TouchableOpacity
+          onPress={() => !isLoading && handleSubmitButton()}
+          style={styles.userContainer}
+        >
+          <Image
+            source={{ uri: currentUser.profile_picture }}
+            style={styles.userImage}
+          />
+          <Text style={styles.userText}>Your story</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => !isLoading && handleSubmitButton()}
+          style={styles.userContainer}
+        >
+          <View style={styles.iconBorder}>
+            <MaterialIcons name="stars" size={23} color={"#3b3"} />
+          </View>
+          <Text style={styles.userText}>Close Friends</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => !isLoading && handleSubmitButton()}
+          style={styles.nextButtonContainer}
+        >
+          {isLoading ? (
+            <ActivityIndicator />
+          ) : (
+            <Ionicons name="arrow-forward" size={30} color={"#000"} />
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+      <MessageModal
+        messageModalVisible={messageModalVisible}
+        message={"This feature is not yet implemented."}
+        height={80}
+      />
+      <View style={{ height: insets.bottom }} />
+    </View>
+  );
+};
+
+export default NewStory;
+
+const styles = StyleSheet.create({
+  container: {
+    paddingTop: Platform.OS === "ios" ? 54 : 54,
+    backgroundColor: "#000",
+    flex: 1,
+  },
+  topButtonsContainer: {
+    zIndex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    position: "relative",
+    marginTop: -50,
+    top: 56,
+    marginHorizontal: 12,
+  },
+  modButtonsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  modButtonContainer: {
+    height: 44,
+    width: 44,
+    borderRadius: 100,
+    backgroundColor: "#484040",
+    justifyContent: "center",
+    alignItems: "center",
+    opacity: 0.92,
+  },
+  modButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 18,
+    marginBottom: 8,
+    transform: [{ scaleY: 1.1 }],
+  },
+  image: {
+    width: SIZES.Width,
+    height:
+      Platform.OS === "android" ? SIZES.Height * 0.925 : SIZES.Height * 0.85,
+    borderRadius: 25,
+  },
+  backButtonContainer: {
+    height: 45,
+    width: 45,
+    borderRadius: 100,
+    zIndex: 2,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#444040",
+    opacity: 0.99,
+  },
+  buttonIcon: {
+    paddingLeft: 10,
+  },
+  bottomButtonsContainer: {
+    height: SIZES.Height * 0.08,
+    paddingHorizontal: 15,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  userContainer: {
+    flex: 1,
+    height: 44,
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    alignItems: "center",
+    borderRadius: 30,
+    paddingHorizontal: 10,
+    backgroundColor: "#333",
+  },
+  userImage: {
+    height: 26,
+    width: 26,
+    borderRadius: 100,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  userText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 12,
+    marginBottom: Platform.OS === "android" ? 4 : 0,
+  },
+  nextButtonContainer: {
+    backgroundColor: "#fff",
+    height: 45,
+    width: 45,
+    borderRadius: 100,
+    zIndex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  iconBorder: {
+    backgroundColor: "#fff",
+    borderRadius: 100,
+  },
+});
+
+==================== .igfix/Notifications.jsx ====================
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  FlatList,
+  Platform,
+} from "react-native";
+import { useEffect, useState } from "react";
+import { MaterialIcons, AntDesign } from "@expo/vector-icons";
+import Requests from "../components/follow/Requests";
+import Interaction from "../components/notifications/Interaction";
+import useFetchRequests from "../hooks/useFetchRequests";
+import useFetchUserPosts from "../hooks/useFetchUserPosts";
+import { LinearGradient } from "expo-linear-gradient";
+import { SIZES } from "../constants";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../services/firebase";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const Notifications = ({ navigation, route }) => {
+  const currentUser = route?.params?.currentUser;
+
+  const { posts = [] } = useFetchUserPosts(currentUser?.email);
+  const { requests = [] } = useFetchRequests({
+    user: currentUser,
+  });
+
+  const [notificationCounter, setNotificationCounter] = useState(0);
+
+  useEffect(() => {
+    if (!currentUser?.email) return;
+
+    const resetEventNotification = async () => {
+      if ((currentUser?.event_notification ?? 0) > 0) {
+        try {
+          await updateDoc(doc(db, "users", currentUser.email), {
+            event_notification: 0,
+          });
+        } catch (error) {
+          console.log("Notification reset error:", error);
+        }
+      }
+    };
+
+    resetEventNotification();
+  }, [currentUser?.email]);
+
+  useEffect(() => {
+    if (!currentUser?.email) return;
+
+    let counter = 0;
+
+    for (const post of posts) {
+      if (!post || post.id === "empty") continue;
+
+      const comments = Array.isArray(post.comments)
+        ? post.comments
+        : [];
+
+      const newLikes = Array.isArray(post.new_likes)
+        ? post.new_likes
+        : [];
+
+      if (comments.length > 0) {
+        const lastComment = comments[comments.length - 1];
+
+        if (lastComment?.email !== currentUser.email) {
+          counter++;
+        }
+      }
+
+      if (newLikes.length > 0) {
+        counter++;
+      }
+    }
+
+    const followerRequests = Array.isArray(currentUser.followers_request)
+      ? currentUser.followers_request
+      : [];
+
+    counter += followerRequests.length;
+
+    setNotificationCounter(counter);
+  }, [posts, currentUser]);
+
+  const validPosts = posts.filter(
+    (post) => post && post.id !== "empty"
+  );
+
+  if (!currentUser) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.footerContainer}>
+          <Text style={styles.title}>User information unavailable</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.button}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={styles.titleContainer}
+      >
+        <MaterialIcons
+          name="arrow-back-ios"
+          size={22}
+          color="#fff"
+        />
+        <Text style={styles.textTitle}>Notifications</Text>
+      </TouchableOpacity>
+
+      {notificationCounter > 0 ? (
+        <View style={{ flex: 1 }}>
+          {Array.isArray(currentUser.followers_request) &&
+            currentUser.followers_request.length > 0 && (
+              <View>
+                <Text style={styles.subtitle}>
+                  Followers Requests:
+                </Text>
+
+                <FlatList
+                  data={requests}
+                  keyExtractor={(item, index) =>
+                    item?.email || index.toString()
+                  }
+                  renderItem={({ item }) => (
+                    <Requests user={item} />
+                  )}
+                />
+              </View>
+            )}
+
+          <FlatList
+            data={validPosts}
+            keyExtractor={(item, index) =>
+              item?.id || index.toString()
+            }
+            renderItem={({ item }) => {
+              const comments = Array.isArray(item.comments)
+                ? item.comments
+                : [];
+
+              const newLikes = Array.isArray(item.new_likes)
+                ? item.new_likes
+                : [];
+
+              if (
+                comments.length > 0 &&
+                comments[comments.length - 1]?.username !==
+                  currentUser.username
+              ) {
+                return (
+                  <Interaction
+                    navigation={navigation}
+                    item={{
+                      ...item,
+                      comments,
+                      new_likes: newLikes,
+                    }}
+                    currentUser={currentUser}
+                    text="commented"
+                  />
+                );
+              }
+
+              if (newLikes.length > 0) {
+                return (
+                  <Interaction
+                    navigation={navigation}
+                    item={{
+                      ...item,
+                      comments,
+                      new_likes: newLikes,
+                    }}
+                    currentUser={currentUser}
+                    text="liked"
+                  />
+                );
+              }
+
+              return null;
+            }}
+          />
+        </View>
+      ) : (
+        <View style={styles.footerContainer}>
+          <LinearGradient
+            start={[0.9, 0.45]}
+            end={[0.07, 1.03]}
+            colors={["#ff00ff", "#ff4400", "#ffff00"]}
+            style={styles.rainbowBorder}
+          >
+            <AntDesign
+              name="checkcircle"
+              size={58}
+              color="#000"
+            />
+          </LinearGradient>
+
+          <Text style={styles.title}>
+            No notifications for now
+          </Text>
+
+          <Text style={styles.text}>
+            There are no notifications from the past 30 days.
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.button}>
+              Back to home
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </SafeAreaView>
+  );
+};
+
+export default Notifications;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    paddingTop: 0,
+  },
+
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginTop: 14,
+    marginBottom: Platform.OS === "android" ? 20 : 4,
+    gap: 3,
+  },
+
+  textTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 4,
+    transform: [{ scaleY: 1.1 }],
+  },
+
+  subtitle: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 17,
+    marginHorizontal: 20,
+  },
+
+  footerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: SIZES.Height * 0.18,
+    gap: 10,
+  },
+
+  rainbowBorder: {
+    padding: 3,
+    height: 63.5,
+    width: 63.5,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 100,
+  },
+
+  title: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+
+  text: {
+    color: "#fff",
+    fontSize: 14,
+    textAlign: "center",
+  },
+
+  button: {
+    color: "#09f",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+});
+
+==================== .igfix/RenderItem.jsx ====================
+import { StyleSheet, TouchableOpacity, View, Platform } from "react-native";
+import { Image } from "expo-image";
+import Animated from "react-native-reanimated";
+import { SIZES } from "../../constants";
+
+const RenderItem = ({ navigation, item }) => {
+  return (
+    <View>
+      {item.imageUrl && (
+        <TouchableOpacity
+          onPress={() => navigation.navigate("Detail", { item: item })}
+          style={styles.imagesContainer}
+          key={item.id}
+        >
+          {Platform.OS === "ios" && (
+            <Animated.Image
+              style={styles.images}
+              source={{ uri: item.imageUrl }}
+            />
+          )}
+          <Image source={{ uri: item.imageUrl }} style={styles.Images} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+};
+
+export default RenderItem;
+
+const styles = StyleSheet.create({
+  imagesContainer: {
+    width: SIZES.Width * 0.335,
+    height: SIZES.Width * 0.335,
+    margin: -0.4,
+  },
+  images: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    borderWidth: 1,
+    zIndex: -1,
+  },
+  Images: {
+    width: "100%",
+    height: "100%",
+    borderWidth: 1,
+  },
+});
+
+==================== .igfix/Search.jsx ====================
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Animated,
+  View,
+  Keyboard,
+} from "react-native";
+import { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { SIZES } from "../constants";
+import { useUserContext } from "../contexts/UserContext";
+import useSlideOnKeyboard from "../utils/useSlideOnKeyboard";
+import useHeaderScrollAnim from "../utils/useHeaderScrollAnim";
+import useFadeInOutAnim from "../utils/useFadeInOutAnim";
+import DefaultPosts from "../components/search/DefaultPosts";
+import useFindUsers from "../hooks/useFindUsers";
+import Searching from "../components/search/Searching";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const Search = ({ navigation }) => {
+  const { currentUser } = useUserContext();
+  const { headerTranslate, headerOpacity, scrollY } = useHeaderScrollAnim(43);
+  const [searchKey, setSearchKey] = useState("");
+  const { beginSearch, users, searchResult } = useFindUsers({
+    currentUser,
+    searchKey,
+  });
+
+  const [focusedBar, setFocusedBar] = useState(false);
+  const [inputWidth, setInputWidth] = useState(SIZES.Width / 0.9);
+  const [searching, setSearching] = useState(false);
+  const { fadeEffect } = useFadeInOutAnim({ focusedBar });
+
+  const { slideAnimation, forceSlideAnimation } = useSlideOnKeyboard(
+    SIZES.Width * 0.75,
+    SIZES.Width * 0.92
+  );
+
+  const handleFocus = () => {
+    beginSearch();
+    forceSlideAnimation(true);
+    clearTimeout();
+    setFocusedBar(true);
+    setSearching(true);
+    setInputWidth(SIZES.Width * 0.7);
+  };
+
+  const handleCancel = () => {
+    forceSlideAnimation(false);
+    setFocusedBar(false);
+    setSearching(false);
+    Keyboard.dismiss();
+    setInputWidth(SIZES.Width * 0.8);
+  };
+
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: false }
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <Animated.View
+        style={[
+          styles.header(70),
+          {
+            transform: [{ translateY: headerTranslate }],
+          },
+        ]}
+      >
+        <View style={styles.searchBar}>
+          <Animated.View
+            style={[
+              styles.searchWrapper,
+              { width: slideAnimation },
+              { opacity: headerOpacity },
+            ]}
+          >
+            <Ionicons
+              name="search"
+              size={18}
+              color={"#999"}
+              style={styles.searchIcon}
+            />
+
+            <TextInput
+              value={searchKey}
+              onChangeText={setSearchKey}
+              maxLength={30}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Search"
+              placeholderTextColor={"#999"}
+              style={[styles.searchInput, { width: inputWidth }]}
+              enterKeyHint="search"
+              onFocus={() => handleFocus()}
+            />
+          </Animated.View>
+          {focusedBar && (
+            <TouchableOpacity onPress={() => handleCancel()}>
+              <Text style={styles.cancelBtn}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </Animated.View>
+      <View style={styles.result}>
+        <DefaultPosts navigation={navigation} handleScroll={handleScroll} />
+
+        {searching && (
+          <Animated.View
+            style={[
+              styles.searchingContainer,
+              {
+                opacity: fadeEffect,
+              },
+            ]}
+          >
+            <Searching
+              navigation={navigation}
+              searchResult={searchKey.length > 0 ? searchResult : users}
+              currentUser={currentUser}
+            />
+          </Animated.View>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+};
+
+export default Search;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  header: (ContainerHeight) => ({
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 35,
+    height: ContainerHeight,
+    zIndex: 1,
+    backgroundColor: "#000",
+  }),
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: 22,
+  },
+  searchWrapper: {
+    marginLeft: SIZES.Width * 0.03,
+    backgroundColor: "#252525",
+    height: 38,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  searchIcon: {
+    marginLeft: 8,
+  },
+  searchInput: {
+    color: "#fff",
+    height: "100%",
+    marginLeft: 5,
+  },
+  cancelBtn: {
+    color: "#fff",
+    fontWeight: "500",
+    fontSize: 16,
+    marginLeft: 15,
+  },
+  result: {
+    flex: 1,
+  },
+  searchingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+  },
+});
+
+==================== .igfix/Stories.jsx ====================
+import {
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  View,
+  ScrollView,
+  Platform,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useState, useEffect } from "react";
+import { Image } from "expo-image";
+import StoriesSkeleton from "./skeletons/StoriesSkeleton";
+import { useStoriesContext } from "../../contexts/StoriesContext";
+import useCheckStoriesSeen from "../../hooks/useCheckStoriesSeen";
+import { Entypo } from "@expo/vector-icons";
+
+const Stories = ({ navigation, currentUser }) => {
+  const { stories, updatedStories } = useStoriesContext();
+  const { checkStoriesSeen } = useCheckStoriesSeen();
+  const [ownStory, setOwnStory] = useState(false);
+  const [seenOwnStory, setSeenOwnStory] = useState(false);
+  const [reducedStories, setReducedStories] = useState([]);
+
+  useEffect(() => {
+    setOwnStory();
+    stories.find((story) => {
+      return story?.username === currentUser?.username;
+    });
+
+    setSeenOwnStory(
+      checkStoriesSeen(currentUser?.username, currentUser?.email)
+    );
+
+    const uniqueStories = {};
+    const uniqueStoriesArray = [];
+
+    stories.forEach((story) => {
+      if (!uniqueStories[story?.username]) {
+        uniqueStories[story?.username] = true;
+        uniqueStoriesArray.push(story);
+      }
+    });
+    setReducedStories(uniqueStoriesArray);
+  }, [updatedStories]);
+
+  useEffect(() => {
+    stories.forEach((story) => {
+      Image.prefetch([{ uri: story?.imageUrl }]);
+    });
+  }, []);
+
+  return (
+    <View>
+      {stories.length > 2 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.container}>
+            <TouchableOpacity
+              onPress={() =>
+                ownStory
+                  ? navigation.navigate("Story", {
+                      stories: stories.filter(
+                        (story) => story?.username === currentUser?.username
+                      ),
+                      currentUser: currentUser,
+                    })
+                  : navigation.navigate("MediaLibrary", {
+                      initialSelectedType: "Add to story",
+                      selectorAvailable: false,
+                    })
+              }
+            >
+              {!ownStory ? (
+                <View>
+                  <View style={styles.emptyStoryBorder}>
+                    <View style={styles.underImage} />
+                    <Image
+                      source={{
+                        uri: currentUser?.profile_picture,
+                      }}
+                      style={styles.image}
+                    />
+                  </View>
+                  <View style={styles.addBtn}>
+                    <Entypo name="plus" size={18} color="#eee" />
+                  </View>
+
+                  <Text style={styles.seenUser}>Your story</Text>
+                </View>
+              ) : seenOwnStory ? (
+                <View>
+                  <View style={styles.seenStoryBorder}>
+                    <Image
+                      source={{
+                        uri: currentUser?.profile_picture,
+                      }}
+                      style={styles.imageWithStory}
+                    />
+                  </View>
+
+                  <Text style={styles.seenUser}>Your story</Text>
+                </View>
+              ) : (
+                <View>
+                  <LinearGradient
+                    start={[0.9, 0.45]}
+                    end={[0.07, 1.03]}
+                    colors={["#ff00ff", "#ff4400", "#ffff00"]}
+                    style={styles.unseenRainbowBorder}
+                  >
+                    <Image
+                      source={{
+                        uri: currentUser?.profile_picture,
+                      }}
+                      style={styles.imageWithStory}
+                    />
+                  </LinearGradient>
+
+                  <Text style={styles.seenUser}>Your story</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+          {reducedStories
+            .filter((story) => story?.username != currentUser?.username)
+            .map((story, index) => (
+              <View style={styles.container} key={index}>
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate("Story", {
+                      stories: stories.filter(
+                        (eachStory) => story?.username === eachStory?.username
+                      ),
+                      currentUser: currentUser,
+                    })
+                  }
+                >
+                  {checkStoriesSeen(story?.username, currentUser?.email) ? (
+                    <View style={styles.itemContainer}>
+                      <View style={styles.seenStoryBorder}>
+                        <Image
+                          source={{ uri: story.profile_picture }}
+                          style={styles.imageWithStory}
+                        />
+                      </View>
+                      <Text numberOfLines={1} style={styles.seenUser}>
+                        {story?.username}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.itemContainer}>
+                      <LinearGradient
+                        start={[0.9, 0.45]}
+                        end={[0.07, 1.03]}
+                        colors={["#ff00ff", "#ff4400", "#ffff00"]}
+                        style={styles.unseenRainbowBorder}
+                      >
+                        <View style={styles.underImage} />
+                        <Image
+                          source={{ uri: story?.profile_picture }}
+                          style={styles.imageWithStory}
+                        />
+                      </LinearGradient>
+                      <Text numberOfLines={1} style={styles.user}>
+                        {story?.username}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ))}
+        </ScrollView>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <StoriesSkeleton />
+        </ScrollView>
+      )}
+    </View>
+  );
+};
+
+export default Stories;
+
+const styles = StyleSheet.create({
+  container: {
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: Platform.OS === "android" ? 11 : 11,
+    marginLeft: 12,
+  },
+  itemContainer: {
+    width: 94,
+    alignItems: "center",
+  },
+  underImage: {
+    position: "absolute",
+    height: 83,
+    width: 83,
+    borderRadius: 100,
+    zIndex: 2,
+    backgroundColor: "#000",
+    zIndex: -1,
+  },
+  image: {
+    height: 83,
+    width: 83,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: "#444",
+    marginBottom: 7,
+  },
+  user: {
+    marginTop: 3,
+    fontSize: 12,
+    color: "#fff",
+    textAlign: "center",
+  },
+  seenUser: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#bbb",
+    textAlign: "center",
+  },
+  imageWithStory: {
+    height: 86,
+    width: 86,
+    borderRadius: 100,
+    borderWidth: 2,
+    borderColor: "#000",
+  },
+  seenStoryBorder: {
+    height: 91.5,
+    width: 91.5,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 100,
+    borderWidth: 1.5,
+    borderColor: "#666",
+  },
+  unseenRainbowBorder: {
+    height: 91.5,
+    width: 91.5,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 100,
+  },
+  addBtn: {
+    backgroundColor: "#18d",
+    height: 30,
+    width: 30,
+    borderRadius: 100,
+    borderWidth: 3.5,
+    borderColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+    position: "absolute",
+    left: 54,
+    top: 54,
+  },
+});
+
+==================== .igfix/StoryHighlights.jsx ====================
+import { StyleSheet, Text, View, FlatList, Platform } from "react-native";
+import useFetchUserPosts from "../../hooks/useFetchUserPosts";
+import SubHeader from "./SubHeader";
+import { Divider } from "react-native-elements";
+import SkeletonDefaultPosts from "../search/Skeletons/SkeletonDefaultPosts";
+import RenderItem from "../shared/RenderItem";
+
+const StoryHighlights = ({ navigation, currentUser }) => {
+  const { posts, loader, fetchOlderPosts, refreshPosts } = useFetchUserPosts(
+    currentUser?.email
+  );
+
+  const renderListHeaderComponent = () => (
+    <View>
+      <SubHeader
+        navigation={navigation}
+        currentUser={currentUser}
+        numberOfPosts={posts.length}
+      />
+      <Text style={styles.title}>Story Highlights</Text>
+      <Divider width={0.5} color="#222" />
+      <View style={styles.gap} />
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      {posts.id === "empty" ? null : posts.length > 0 ? (
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <RenderItem navigation={navigation} item={item} />
+          )}
+          numColumns={3}
+          ListHeaderComponent={renderListHeaderComponent}
+          scrollEventThrottle={16}
+          onEndReached={() => fetchOlderPosts}
+          onEndReachedThreshold={1}
+          initialNumToRender={10}
+          onRefresh={() => refreshPosts()}
+          refreshing={loader}
+          ListFooterComponent={() => <View style={{ height: 50 }} />}
+        />
+      ) : (
+        <FlatList
+          style={{ flex: 1, marginTop: 14 }}
+          data={Array.from({ length: 30 }, (_, i) => i + 1)}
+          ListHeaderComponent={renderListHeaderComponent}
+          numColumns={3}
+          renderItem={() => <SkeletonDefaultPosts />}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+    </View>
+  );
+};
+
+export default StoryHighlights;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  title: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: Platform.OS === "android" ? "600" : "700",
+    marginHorizontal: 20,
+    marginTop: Platform.OS === "android" ? 22 : 15,
+    marginBottom: Platform.OS === "android" ? 12 : 8,
+  },
+});
+
+==================== .igfix/useFindUsers.js ====================
+import { useEffect, useState, useCallback } from "react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "../services/firebase";
+
+const useFindUsers = ({ currentUser, searchKey }) => {
+  const [users, setUsers] = useState([]);
+  const [searchResult, setSearchResult] = useState([]);
+
+  const beginSearch = useCallback(() => {
+    const q = query(
+      collection(db, "users"),
+      where("username", "!=", currentUser.username)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((doc, index) => ({
+        id: index,
+        ...doc.data(),
+      }));
+      setUsers(data);
+    });
+
+    return unsubscribe;
+  }, [currentUser?.username]);
+
+  useEffect(() => {
+    if (!searchKey) {
+      setSearchResult([]);
+      return;
+    }
+    const data = users.filter((user) => {
+      const keyLower = searchKey.toLowerCase();
+      return (
+        user.username.toLowerCase().includes(keyLower) ||
+        user.email.toLowerCase().includes(keyLower) ||
+        user.name.toLowerCase().includes(keyLower)
+      );
+    });
+    setSearchResult(data);
+  }, [searchKey, users]);
+
+  return {
+    beginSearch,
+    users,
+    searchResult,
+  };
+};
+
+export default useFindUsers;
+
+==================== .igfix/useUploadComment.js ====================
+import { useState } from "react";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  arrayUnion,
+  Timestamp,
+  increment,
+} from "firebase/firestore";
+import { db } from "../services/firebase";
+
+const useUploadComment = (post, currentUser) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const uploadComment = async (value) => {
+    if (!isLoading) {
+      setIsLoading(true);
+      try {
+        const postRef = doc(db, "users", post.owner_email, "posts", post.id);
+        const snapshot = await getDoc(postRef);
+
+        if (snapshot.exists()) {
+          const newComment = {
+            email: currentUser.email,
+            profile_picture: currentUser.profile_picture,
+            username: currentUser.username,
+            comment: value,
+            createdAt: Timestamp.now(),
+            likes_by_users: [],
+          };
+
+          await updateDoc(postRef, {
+            comments: arrayUnion(newComment),
+          });
+
+          if (post.owner_email !== currentUser.email) {
+            const ownerRef = doc(db, "users", post.owner_email);
+            await updateDoc(ownerRef, {
+              event_notification: increment(1),
+            });
+          }
+        } else {
+          console.log("No such document!");
+        }
+      } catch (error) {
+        console.log(error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  return {
+    uploadComment,
+    isLoading,
+  };
+};
+
+export default useUploadComment;
+
+==================== .igfix/useUploadStory.js ====================
+import { useState } from "react";
+import { collection, doc, addDoc, serverTimestamp } from "firebase/firestore";
+import useUploadPicture from "./useUploadPicture";
+import { db } from "../services/firebase";
+
+const useUploadStory = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const { uploadPicture } = useUploadPicture();
+
+  const uploadStory = async (imageUrl, currentUser) => {
+    if (isLoading) return;
+    setIsLoading(true);
+    try {
+      const timestamp = new Date().getTime();
+      const uploadedImageUrl = await uploadPicture(
+        imageUrl,
+        currentUser.email,
+        timestamp
+      );
+
+      const newStory = {
+        imageUrl: uploadedImageUrl,
+        username: currentUser.username,
+        name: currentUser.name,
+        profile_picture: currentUser.profile_picture,
+        owner_uid: currentUser.owner_uid,
+        owner_email: currentUser.email,
+        createdAt: serverTimestamp(),
+        likes_by_users: [],
+        new_likes: [],
+        seen_by_users: [],
+      };
+
+      const storiesCollectionRef = collection(
+        db,
+        "users",
+        currentUser.email,
+        "stories"
+      );
+      await addDoc(storiesCollectionRef, newStory);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return {
+    uploadStory,
+    isLoading,
+  };
+};
+
+export default useUploadStory;

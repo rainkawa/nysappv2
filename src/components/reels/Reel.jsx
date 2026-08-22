@@ -66,14 +66,14 @@ const Reel = ({
           item.likes_by_users.includes(currentUser?.email) ? (
             <MaterialCommunityIcons
               name="cards-heart"
-              size={30}
+              size={27}
               color="#e33"
               style={styles.heartIcon}
             />
           ) : (
             <MaterialCommunityIcons
               name="cards-heart-outline"
-              size={30}
+              size={27}
               color="#fff"
               style={styles.heartIcon}
             />
@@ -88,7 +88,7 @@ const Reel = ({
         >
           <MaterialCommunityIcons
             name="chat-outline"
-            size={32}
+            size={28}
             color="#fff"
             style={styles.chatIcon}
           />
@@ -100,14 +100,14 @@ const Reel = ({
           onPress={() => handleFeatureNotImplemented(setMessageModalVisible)}
           style={styles.touchableOpacity}
         >
-          <Feather name="send" size={26} color="#fff" style={styles.sendIcon} />
+          <Feather name="send" size={24} color="#fff" style={styles.sendIcon} />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => handleFeatureNotImplemented(setMessageModalVisible)}
           style={styles.touchableOpacity}
         >
           <Text style={styles.sideText}>{item.shared}</Text>
-          <Ionicons name="ellipsis-horizontal" size={26} color="#fff" />
+          <Ionicons name="ellipsis-horizontal" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -171,11 +171,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     marginBottom: 15,
-    marginRight: 15,
+    marginRight: 12,
     justifyContent: "center",
     alignItems: "center",
-    paddingBottom: 26,
-    gap: 10,
+    paddingBottom: 18,
+    gap: 7,
   },
   touchableOpacity: {
     alignItems: "center",
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   sideText: {
     color: "#fff",
     fontWeight: "600",
-    fontSize: 12,
+    fontSize: 11,
     marginBottom: 26,
   },
   heartIcon: {
@@ -213,15 +213,15 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   rainbowBorder: {
-    height: 40.5,
-    width: 40.5,
+    height: 38,
+    width: 38,
     borderRadius: 100,
     justifyContent: "center",
     alignItems: "center",
   },
   profilePicture: {
-    height: 39,
-    width: 39,
+    height: 36,
+    width: 36,
     borderWidth: 2,
     borderColor: "#666",
     borderRadius: 100,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   profileUsername: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 14,
+    fontSize: 13,
     marginLeft: 3,
     marginBottom: 4,
   },
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   captionText: {
     color: "#fff",
     fontWeight: "400",
-    fontSize: 14,
+    fontSize: 13,
     marginTop: 4,
     maxWidth: SIZES.Width * 0.8,
     marginBottom: 14,

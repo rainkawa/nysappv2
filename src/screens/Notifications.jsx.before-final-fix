@@ -1,0 +1,346 @@
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  FlatList,
+  Platform,
+} from "react-native";
+import { useEffect, useMemo } from "react";
+import { MaterialIcons, AntDesign } from "@expo/vector-icons";
+import Requests from "../components/follow/Requests";
+import Interaction from "../components/notifications/Interaction";
+import useFetchRequests from "../hooks/useFetchRequests";
+import useFetchUserPosts from "../hooks/useFetchUserPosts";
+import { LinearGradient } from "expo-linear-gradient";
+import { SIZES } from "../constants";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../services/firebase";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const getTimestampValue = (value) => {
+  if (!value) return 0;
+
+  if (typeof value?.toMillis === "function") {
+    return value.toMillis();
+  }
+
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value?.seconds === "number") {
+    return value.seconds * 1000;
+  }
+
+  return 0;
+};
+
+const Notifications = ({ navigation, route }) => {
+  const currentUser = route?.params?.currentUser;
+
+  const { posts = [] } = useFetchUserPosts(
+    currentUser?.email
+  );
+
+  const { requests = [] } = useFetchRequests({
+    user: currentUser,
+  });
+
+  useEffect(() => {
+    if (!currentUser?.email) return;
+
+    const resetEventNotification = async () => {
+      if ((currentUser.event_notification ?? 0) <= 0) {
+        return;
+      }
+
+      try {
+        await updateDoc(
+          doc(db, "users", currentUser.email),
+          {
+            event_notification: 0,
+          }
+        );
+      } catch (error) {
+        console.log(
+          "Notification reset error:",
+          error
+        );
+      }
+    };
+
+    resetEventNotification();
+  }, [currentUser?.email]);
+
+  const notifications = useMemo(() => {
+    if (!currentUser?.email) {
+      return [];
+    }
+
+    const result = [];
+
+    const followerRequests = Array.isArray(
+      currentUser.followers_request
+    )
+      ? currentUser.followers_request
+      : [];
+
+    followerRequests.forEach((request, index) => {
+      result.push({
+        type: "request",
+        id: `request-${request?.email || index}`,
+        data: request,
+        createdAt: getTimestampValue(
+          request?.createdAt
+        ),
+      });
+    });
+
+    for (const post of posts) {
+      if (!post || post.id === "empty") {
+        continue;
+      }
+
+      const comments = Array.isArray(post.comments)
+        ? post.comments
+        : [];
+
+      const newLikes = Array.isArray(post.new_likes)
+        ? post.new_likes
+        : [];
+
+      const latestComment = comments
+        .filter(
+          (comment) =>
+            comment?.email &&
+            comment.email !== currentUser.email
+        )
+        .sort(
+          (a, b) =>
+            getTimestampValue(b?.createdAt) -
+            getTimestampValue(a?.createdAt)
+        )[0];
+
+      if (latestComment) {
+        result.push({
+          type: "comment",
+          id: `comment-${post.id}-${latestComment.email}-${getTimestampValue(
+            latestComment.createdAt
+          )}`,
+          post: {
+            ...post,
+            comments,
+            new_likes: newLikes,
+          },
+          actor: latestComment,
+          createdAt: getTimestampValue(
+            latestComment.createdAt
+          ),
+        });
+      }
+
+      const latestLike = newLikes[newLikes.length - 1];
+
+      if (latestLike) {
+        result.push({
+          type: "like",
+          id: `like-${post.id}-${latestLike?.email || "unknown"}`,
+          post: {
+            ...post,
+            comments,
+            new_likes: newLikes,
+          },
+          actor: latestLike,
+          createdAt: getTimestampValue(
+            latestLike?.createdAt
+          ),
+        });
+      }
+    }
+
+    return result.sort(
+      (a, b) => b.createdAt - a.createdAt
+    );
+  }, [posts, currentUser]);
+
+  if (!currentUser) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.footerContainer}>
+          <Text style={styles.title}>
+            User information unavailable
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.button}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView
+      style={styles.container}
+      edges={["top", "bottom"]}
+    >
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={styles.titleContainer}
+      >
+        <MaterialIcons
+          name="arrow-back-ios"
+          size={22}
+          color="#fff"
+        />
+
+        <Text style={styles.textTitle}>
+          Notifications
+        </Text>
+      </TouchableOpacity>
+
+      {notifications.length > 0 ? (
+        <FlatList
+          data={notifications}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => {
+            if (item.type === "request") {
+              return (
+                <Requests
+                  user={item.data}
+                  currentUser={currentUser}
+                  navigation={navigation}
+                />
+              );
+            }
+
+            return (
+              <Interaction
+                navigation={navigation}
+                item={item.post}
+                currentUser={currentUser}
+                text={
+                  item.type === "comment"
+                    ? "commented"
+                    : "liked"
+                }
+                activity={item.actor}
+                createdAt={item.createdAt}
+              />
+            );
+          }}
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={
+            <View style={{ height: 40 }} />
+          }
+        />
+      ) : (
+        <View style={styles.footerContainer}>
+          <LinearGradient
+            start={[0.9, 0.45]}
+            end={[0.07, 1.03]}
+            colors={[
+              "#ff00ff",
+              "#ff4400",
+              "#ffff00",
+            ]}
+            style={styles.rainbowBorder}
+          >
+            <AntDesign
+              name="checkcircle"
+              size={58}
+              color="#000"
+            />
+          </LinearGradient>
+
+          <Text style={styles.title}>
+            No notifications for now
+          </Text>
+
+          <Text style={styles.text}>
+            There are no notifications yet.
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.button}>
+              Back to home
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </SafeAreaView>
+  );
+};
+
+export default Notifications;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    paddingTop: 0,
+  },
+
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginTop: 14,
+    marginBottom:
+      Platform.OS === "android" ? 20 : 4,
+    gap: 3,
+  },
+
+  textTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 4,
+    transform: [{ scaleY: 1.1 }],
+  },
+
+  footerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: SIZES.Height * 0.18,
+    gap: 10,
+  },
+
+  rainbowBorder: {
+    padding: 3,
+    height: 63.5,
+    width: 63.5,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 100,
+  },
+
+  title: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+
+  text: {
+    color: "#999",
+    fontSize: 14,
+    textAlign: "center",
+  },
+
+  button: {
+    color: "#09f",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+});

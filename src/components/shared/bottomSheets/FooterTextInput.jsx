@@ -11,103 +11,144 @@ import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import { Image } from "expo-image";
 import useUploadComment from "../../../hooks/useUploadComment";
 
-const FooterTextInput = ({ post, currentUser }) => {
+const FooterTextInput = ({
+  post,
+  currentUser,
+}) => {
   const [value, setValue] = useState("");
-  const { uploadComment, isLoading } = useUploadComment(post, currentUser);
 
-  const handleSubmitComment = async (value) => {
-    await uploadComment(value);
-    setValue("");
+  const {
+    uploadComment,
+    isLoading,
+  } = useUploadComment(
+    post,
+    currentUser
+  );
+
+  const handleSubmitComment = async () => {
+    const text = value.trim();
+
+    if (!text || isLoading) {
+      return;
+    }
+
+    const success = await uploadComment(text);
+
+    if (success) {
+      setValue("");
+    }
+  };
+
+  const addEmoji = (emoji) => {
+    setValue((previous) =>
+      `${previous}${emoji}`
+    );
   };
 
   return (
     <View style={styles.inputContainer}>
       <View style={styles.divider} />
+
       <View style={styles.iconContainer}>
         <TouchableOpacity
-          onPress={() => {
-            setValue(value + "❤️");
-          }}
+          onPress={() => addEmoji("❤️")}
         >
           <Text style={styles.chatIcon}>❤️</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          onPress={() => {
-            setValue(value + "🙌");
-          }}
+          onPress={() => addEmoji("🙌")}
         >
           <Text style={styles.chatIcon}>🙌</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          onPress={() => {
-            setValue(value + "🔥");
-          }}
+          onPress={() => addEmoji("🔥")}
         >
           <Text style={styles.chatIcon}>🔥</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          onPress={() => {
-            setValue(value + "👏");
-          }}
+          onPress={() => addEmoji("👏")}
         >
           <Text style={styles.chatIcon}>👏</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          onPress={() => {
-            setValue(value + "😢");
-          }}
+          onPress={() => addEmoji("😢")}
         >
           <Text style={styles.chatIcon}>😢</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          onPress={() => {
-            setValue(value + "😍");
-          }}
+          onPress={() => addEmoji("😍")}
         >
           <Text style={styles.chatIcon}>😍</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          onPress={() => {
-            setValue(value + "😮");
-          }}
+          onPress={() => addEmoji("😮")}
         >
           <Text style={styles.chatIcon}>😮</Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          onPress={() => {
-            setValue(value + "😂");
-          }}
+          onPress={() => addEmoji("😂")}
         >
           <Text style={styles.chatIcon}>😂</Text>
         </TouchableOpacity>
       </View>
+
       <View style={styles.writingContainer}>
         <Image
           source={{
-            uri: currentUser.profile_picture,
+            uri:
+              currentUser?.profile_picture ||
+              "",
           }}
           style={styles.profilePicture}
         />
+
         <View style={styles.inputWrapper}>
           <BottomSheetTextInput
-            placeholder={`Add a comment...`}
-            placeholderTextColor={"#858585"}
+            placeholder="Add a comment..."
+            placeholderTextColor="#858585"
             style={styles.textInput}
-            defaultValue={value}
-            onChangeText={(text) => setValue(text)}
+            value={value}
+            onChangeText={setValue}
             autoCapitalize="sentences"
-            autoCorrect={true}
+            autoCorrect
             maxLength={255}
             multiline
+            textAlignVertical="center"
           />
-          {!isLoading ? (
-            <TouchableOpacity
-              onPress={() => value !== "" && handleSubmitComment(value)}
-            >
-              <Text style={styles.postBtn}>{value !== "" && "Post"}</Text>
-            </TouchableOpacity>
+
+          {isLoading ? (
+            <ActivityIndicator
+              style={styles.activityIndicator}
+              size="small"
+            />
           ) : (
-            <ActivityIndicator style={styles.activityIndicator} />
+            <TouchableOpacity
+              onPress={handleSubmitComment}
+              disabled={!value.trim()}
+              hitSlop={{
+                top: 10,
+                bottom: 10,
+                left: 10,
+                right: 10,
+              }}
+            >
+              <Text
+                style={[
+                  styles.postBtn,
+                  !value.trim() &&
+                    styles.postBtnDisabled,
+                ]}
+              >
+                Post
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -119,59 +160,87 @@ export default FooterTextInput;
 
 const styles = StyleSheet.create({
   inputContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom:
+      Platform.OS === "android" ? 8 : 10,
     backgroundColor: "#232325",
   },
+
+  divider: {
+    height: 1,
+    backgroundColor: "#333",
+    marginBottom: 4,
+  },
+
   iconContainer: {
-    gap: 1,
-    marginLeft: -4,
-    marginVertical: 15,
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
+    justifyContent:
+      "space-between",
+    marginVertical: 7,
   },
+
   chatIcon: {
-    fontSize: 29,
+    fontSize:
+      Platform.OS === "android" ? 24 : 26,
   },
+
   writingContainer: {
     flexDirection: "row",
-    gap: 15,
+    alignItems: "flex-end",
+    gap: 8,
   },
+
   profilePicture: {
-    height: 45,
-    width: 45,
+    height: 38,
+    width: 38,
     borderRadius: 50,
-    marginTop: Platform.OS === "ios" ? 2 : 5,
+    marginBottom: 4,
   },
+
   inputWrapper: {
-    width: 295,
-    borderRadius: 30,
+    flex: 1,
+    minHeight: 42,
+    maxHeight: 110,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "#777",
-    alignItems: "center",
-    paddingLeft: 15,
+    paddingLeft: 12,
+    paddingRight: 8,
     flexDirection: "row",
+    alignItems: "flex-end",
     justifyContent: "space-between",
-    alignItems: "center",
-    flex: 1,
-    paddingVertical: Platform.OS === "ios" ? 8 : 2,
-    marginBottom: 8,
   },
+
   textInput: {
-    fontSize: 16,
     flex: 1,
-    fontWeight: "400",
     color: "#fff",
-    maxWidth: "78%",
-    marginBottom: 5,
+    fontSize: 15,
+    lineHeight:
+      Platform.OS === "android"
+        ? 20
+        : 19,
+    maxHeight: 92,
+    paddingTop: 9,
+    paddingBottom: 8,
+    marginRight: 6,
   },
+
   postBtn: {
     color: "#09f",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
-    paddingRight: 12,
+    paddingHorizontal: 6,
+    paddingBottom: 9,
   },
+
+  postBtnDisabled: {
+    opacity: 0.35,
+  },
+
   activityIndicator: {
-    marginRight: 20,
+    marginHorizontal: 8,
+    marginBottom: 9,
   },
 });

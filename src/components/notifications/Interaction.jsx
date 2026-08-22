@@ -9,51 +9,137 @@ import { Image } from "expo-image";
 import useCheckStoriesSeen from "../../hooks/useCheckStoriesSeen";
 import { LinearGradient } from "expo-linear-gradient";
 
-const Interaction = ({ navigation, item, currentUser, text }) => {
-  const { checkStoriesSeen } = useCheckStoriesSeen();
+const getMillis = (value) => {
+  if (!value) return 0;
 
-  const comments = Array.isArray(item?.comments)
-    ? item.comments
-    : [];
+  if (typeof value?.toMillis === "function") {
+    return value.toMillis();
+  }
 
-  const newLikes = Array.isArray(item?.new_likes)
-    ? item.new_likes
-    : [];
+  if (typeof value?.seconds === "number") {
+    return value.seconds * 1000;
+  }
 
-  const lastComment =
-    comments.length > 0
-      ? comments[comments.length - 1]
-      : null;
+  if (typeof value === "number") {
+    return value;
+  }
+
+  return 0;
+};
+
+const formatTime = (value) => {
+  const millis = getMillis(value);
+
+  if (!millis) {
+    return "";
+  }
+
+  const date = new Date(millis);
+  const now = new Date();
+
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (sameDay) {
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  return date.toLocaleDateString([], {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
+const Interaction = ({
+  navigation,
+  notification,
+  currentUser,
+}) => {
+  const {
+    checkStoriesSeen,
+  } = useCheckStoriesSeen();
+
+  if (!notification) {
+    return null;
+  }
+
+  const {
+    type,
+    actorEmail,
+    actorUsername,
+    actorProfilePicture,
+    postId,
+    postOwnerEmail,
+    postImage,
+    comment,
+    createdAt,
+  } = notification;
+
+  const isComment = type === "comment";
+  const actorName =
+    actorUsername || "Someone";
+
+  const time = formatTime(createdAt);
 
   const handleUserProfile = () => {
+    if (!actorEmail) {
+      return;
+    }
+
     navigation.navigate("UserDetail", {
-      email: lastComment?.email,
+      email: actorEmail,
     });
   };
 
   const handleCheckPost = () => {
-    navigation.navigate("Detail", { item: item });
+    if (!postId || !postOwnerEmail) {
+      return;
+    }
+
+    navigation.navigate("Detail", {
+      item: {
+        id: postId,
+        owner_email: postOwnerEmail,
+        imageUrl: postImage || "",
+      },
+    });
   };
+
+  const seenStory =
+    actorEmail && currentUser?.email
+      ? checkStoriesSeen(
+          actorEmail,
+          currentUser.email
+        )
+      : false;
 
   return (
     <View style={styles.container}>
       <View style={styles.rowContainer}>
-        <TouchableOpacity onPress={() => handleUserProfile()}>
-          {text === "commented" &&
-          lastComment?.email &&
-          checkStoriesSeen(lastComment.email, currentUser.email) ? (
+        <TouchableOpacity
+          onPress={handleUserProfile}
+          disabled={!actorEmail}
+        >
+          {seenStory ? (
             <LinearGradient
               start={[0.9, 0.45]}
               end={[0.07, 1.03]}
-              colors={["#ff00ff", "#ff4400", "#ffff00"]}
+              colors={[
+                "#ff00ff",
+                "#ff4400",
+                "#ffff00",
+              ]}
               style={styles.rainbowBorder}
             >
               <Image
                 source={{
-                  uri:
-                    text === "commented"
-                      ? lastComment?.profile_picture || ""
-                      : newLikes[1] || "",
+                  uri: actorProfilePicture || "",
                 }}
                 style={styles.image}
               />
@@ -61,38 +147,66 @@ const Interaction = ({ navigation, item, currentUser, text }) => {
           ) : (
             <Image
               source={{
-                uri:
-                  text === "commented"
-                    ? lastComment?.profile_picture || ""
-                    : newLikes[1] || "",
+                uri: actorProfilePicture || "",
               }}
               style={styles.nonRainbowImage}
             />
           )}
         </TouchableOpacity>
+
         <View style={styles.userContainer}>
-          <TouchableOpacity onPress={() => handleUserProfile()}>
+          <TouchableOpacity
+            onPress={handleUserProfile}
+            disabled={!actorEmail}
+          >
             <Text style={styles.username}>
-              {text === "commented"
-                ? lastComment?.username || "Someone"
-                : newLikes[0] || "Someone"}
+              {actorName}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleCheckPost()}>
-            <Text style={styles.name}>
-              {text === "commented"
-                ? "Commented your post."
-                : "Liked your post."}
-            </Text>
+
+          <TouchableOpacity
+            onPress={handleCheckPost}
+            disabled={!postId}
+          >
+            <View style={styles.messageRow}>
+              <Text style={styles.name}>
+                {isComment
+                  ? "Commented your post."
+                  : "Liked your post."}
+              </Text>
+
+              {time ? (
+                <Text style={styles.time}>
+                  {" "}
+                  · {time}
+                </Text>
+              ) : null}
+            </View>
+
+            {isComment && comment ? (
+              <Text
+                numberOfLines={1}
+                style={styles.commentPreview}
+              >
+                “{comment}”
+              </Text>
+            ) : null}
           </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity onPress={() => handleCheckPost()}>
-          <Image source={{ uri: item.imageUrl }} style={styles.postImage} />
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        onPress={handleCheckPost}
+        disabled={!postId}
+      >
+        <Image
+          source={{
+            uri: postImage || "",
+          }}
+          style={styles.postImage}
+          contentFit="cover"
+        />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -105,12 +219,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginHorizontal: 12,
-    marginTop: Platform.OS === "android" ? 15 : 8,
+    marginTop:
+      Platform.OS === "android" ? 15 : 8,
   },
+
   rowContainer: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
   },
+
   rainbowBorder: {
     borderRadius: 100,
     height: 58,
@@ -118,6 +236,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
   image: {
     height: 56,
     width: 56,
@@ -125,6 +244,7 @@ const styles = StyleSheet.create({
     borderWidth: 2.5,
     borderColor: "#000",
   },
+
   nonRainbowImage: {
     height: 58,
     width: 58,
@@ -132,20 +252,44 @@ const styles = StyleSheet.create({
     borderColor: "#000",
     borderRadius: 100,
   },
+
   userContainer: {
     justifyContent: "center",
     marginLeft: 15,
+    flex: 1,
+    paddingRight: 8,
   },
+
   username: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 14,
   },
+
+  messageRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+
   name: {
     color: "#ddd",
     fontSize: 13,
     fontWeight: "400",
   },
+
+  time: {
+    color: "#888",
+    fontSize: 12,
+  },
+
+  commentPreview: {
+    color: "#777",
+    fontSize: 12,
+    marginTop: 2,
+    maxWidth: 210,
+  },
+
   postImage: {
     height: 60,
     width: 60,

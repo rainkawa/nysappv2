@@ -1,0 +1,73 @@
+import { useEffect, useState } from "react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "../services/firebase";
+
+const useFindUsers = ({ currentUser, searchKey }) => {
+  const [users, setUsers] = useState([]);
+  const [searchResult, setSearchResult] = useState([]);
+
+  useEffect(() => {
+    if (!currentUser?.username) {
+      setUsers([]);
+      return undefined;
+    }
+
+    const usersQuery = query(
+      collection(db, "users"),
+      where("username", "!=", currentUser.username)
+    );
+
+    const unsubscribe = onSnapshot(
+      usersQuery,
+      (snapshot) => {
+        const data = snapshot.docs
+          .map((userDoc) => ({
+            id: userDoc.id,
+            ...userDoc.data(),
+          }))
+          .filter(
+            (user) => user?.username && user?.email
+          );
+
+        setUsers(data);
+      },
+      (error) => {
+        console.error("User search listener error:", error);
+        setUsers([]);
+      }
+    );
+
+    return unsubscribe;
+  }, [currentUser?.username]);
+
+  useEffect(() => {
+    const normalizedSearch = searchKey?.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      setSearchResult([]);
+      return;
+    }
+
+    const data = users.filter((user) => {
+      const username = String(user?.username || "").toLowerCase();
+      const email = String(user?.email || "").toLowerCase();
+      const name = String(user?.name || "").toLowerCase();
+
+      return (
+        username.includes(normalizedSearch) ||
+        name.includes(normalizedSearch) ||
+        email.includes(normalizedSearch)
+      );
+    });
+
+    setSearchResult(data);
+  }, [searchKey, users]);
+
+  return {
+    beginSearch: () => {},
+    users,
+    searchResult,
+  };
+};
+
+export default useFindUsers;

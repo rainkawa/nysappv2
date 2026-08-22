@@ -1,0 +1,292 @@
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Platform,
+} from "react-native";
+import { Image } from "expo-image";
+import useCheckStoriesSeen from "../../hooks/useCheckStoriesSeen";
+import { LinearGradient } from "expo-linear-gradient";
+
+const formatNotificationTime = (createdAt) => {
+  if (!createdAt) {
+    return "";
+  }
+
+  const timestamp =
+    typeof createdAt === "number"
+      ? createdAt
+      : typeof createdAt?.toMillis === "function"
+      ? createdAt.toMillis()
+      : typeof createdAt?.seconds === "number"
+      ? createdAt.seconds * 1000
+      : 0;
+
+  if (!timestamp) {
+    return "";
+  }
+
+  const date = new Date(timestamp);
+  const now = new Date();
+
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (sameDay) {
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  return date.toLocaleDateString([], {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
+const Interaction = ({
+  navigation,
+  item,
+  currentUser,
+  text,
+  activity,
+  createdAt,
+}) => {
+  const { checkStoriesSeen } = useCheckStoriesSeen();
+
+  const comments = Array.isArray(item?.comments)
+    ? item.comments
+    : [];
+
+  const newLikes = Array.isArray(item?.new_likes)
+    ? item.new_likes
+    : [];
+
+  const actor =
+    activity ||
+    (text === "commented"
+      ? comments[comments.length - 1]
+      : null);
+
+  const actorEmail =
+    actor?.email ||
+    (text === "liked" && typeof newLikes[1] === "string"
+      ? newLikes[1]
+      : "");
+
+  const actorUsername =
+    actor?.username ||
+    (text === "liked" ? newLikes[0] : "") ||
+    "Someone";
+
+  const actorProfilePicture =
+    actor?.profile_picture ||
+    (text === "liked" && typeof newLikes[1] === "string"
+      ? newLikes[1]
+      : "");
+
+  const notificationTime =
+    formatNotificationTime(
+      createdAt || actor?.createdAt
+    );
+
+  const handleUserProfile = () => {
+    if (!actorEmail) {
+      return;
+    }
+
+    navigation.navigate("UserDetail", {
+      email: actorEmail,
+    });
+  };
+
+  const handleCheckPost = () => {
+    if (!item?.id) {
+      return;
+    }
+
+    navigation.navigate("Detail", {
+      item,
+    });
+  };
+
+  const seenStory =
+    actorEmail &&
+    currentUser?.email
+      ? checkStoriesSeen(
+          actorEmail,
+          currentUser.email
+        )
+      : false;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.rowContainer}>
+        <TouchableOpacity
+          onPress={handleUserProfile}
+          disabled={!actorEmail}
+        >
+          {text === "commented" && seenStory ? (
+            <LinearGradient
+              start={[0.9, 0.45]}
+              end={[0.07, 1.03]}
+              colors={[
+                "#ff00ff",
+                "#ff4400",
+                "#ffff00",
+              ]}
+              style={styles.rainbowBorder}
+            >
+              <Image
+                source={{
+                  uri: actorProfilePicture,
+                }}
+                style={styles.image}
+              />
+            </LinearGradient>
+          ) : (
+            <Image
+              source={{
+                uri: actorProfilePicture,
+              }}
+              style={styles.nonRainbowImage}
+            />
+          )}
+        </TouchableOpacity>
+
+        <View style={styles.userContainer}>
+          <TouchableOpacity
+            onPress={handleUserProfile}
+            disabled={!actorEmail}
+          >
+            <Text style={styles.username}>
+              {actorUsername}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleCheckPost}
+            disabled={!item?.id}
+          >
+            <View style={styles.messageRow}>
+              <Text style={styles.name}>
+                {text === "commented"
+                  ? "Commented your post."
+                  : "Liked your post."}
+              </Text>
+
+              {notificationTime ? (
+                <Text style={styles.time}>
+                  {" "}
+                  · {notificationTime}
+                </Text>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          onPress={handleCheckPost}
+          disabled={!item?.id}
+        >
+          <Image
+            source={{
+              uri: item?.imageUrl || "",
+            }}
+            style={styles.postImage}
+            contentFit="cover"
+          />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+export default Interaction;
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 12,
+    marginTop: Platform.OS === "android" ? 15 : 8,
+  },
+
+  rowContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+
+  rainbowBorder: {
+    borderRadius: 100,
+    height: 58,
+    width: 58,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  image: {
+    height: 56,
+    width: 56,
+    borderRadius: 100,
+    borderWidth: 2.5,
+    borderColor: "#000",
+  },
+
+  nonRainbowImage: {
+    height: 58,
+    width: 58,
+    borderWidth: 3,
+    borderColor: "#000",
+    borderRadius: 100,
+  },
+
+  userContainer: {
+    justifyContent: "center",
+    marginLeft: 15,
+    flex: 1,
+    paddingRight: 8,
+  },
+
+  username: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+  messageRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+
+  name: {
+    color: "#ddd",
+    fontSize: 13,
+    fontWeight: "400",
+  },
+
+  time: {
+    color: "#888",
+    fontSize: 12,
+  },
+
+  buttonContainer: {
+    marginLeft: 8,
+  },
+
+  postImage: {
+    height: 60,
+    width: 60,
+    marginRight: 2,
+  },
+});

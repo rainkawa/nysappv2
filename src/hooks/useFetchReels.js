@@ -1,26 +1,61 @@
-import { useState, useEffect } from "react";
-import { collectionGroup, onSnapshot } from "firebase/firestore";
+import { useCallback, useEffect, useState } from "react";
+import {
+  collectionGroup,
+  onSnapshot,
+} from "firebase/firestore";
 import { db } from "../services/firebase";
 
 const useFetchReels = () => {
   const [videos, setVideos] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] =
+    useState(0);
 
   useEffect(() => {
-    const reelsCollection = collectionGroup(db, "reels");
+    setIsLoading(true);
 
-    const unsubscribe = onSnapshot(reelsCollection, (snapshot) => {
-      const videos = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+    const reelsCollection = collectionGroup(
+      db,
+      "reels"
+    );
 
-      setVideos(videos);
-    });
+    const unsubscribe = onSnapshot(
+      reelsCollection,
+      (snapshot) => {
+        const updatedVideos =
+          snapshot.docs.map((reelDoc, index) => ({
+            id: reelDoc.id,
+            index,
+            ...reelDoc.data(),
+          }));
+
+        setVideos(updatedVideos);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error(
+          "useFetchReels error:",
+          error
+        );
+        setVideos([]);
+        setIsLoading(false);
+      }
+    );
 
     return () => unsubscribe();
+  }, [refreshKey]);
+
+  const refreshReels = useCallback(() => {
+    setRefreshKey(
+      (previous) => previous + 1
+    );
   }, []);
 
-  return { videos };
+  return {
+    videos,
+    isLoading,
+    refreshReels,
+  };
 };
 
 export default useFetchReels;

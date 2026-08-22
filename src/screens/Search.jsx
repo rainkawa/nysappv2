@@ -21,27 +21,39 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const Search = ({ navigation }) => {
   const { currentUser } = useUserContext();
-  const { headerTranslate, headerOpacity, scrollY } = useHeaderScrollAnim(43);
+
+  const {
+    headerTranslate,
+    headerOpacity,
+    scrollY,
+  } = useHeaderScrollAnim(43);
+
   const [searchKey, setSearchKey] = useState("");
-  const { beginSearch, users, searchResult } = useFindUsers({
+  const { users, searchResult } = useFindUsers({
     currentUser,
     searchKey,
   });
 
   const [focusedBar, setFocusedBar] = useState(false);
-  const [inputWidth, setInputWidth] = useState(SIZES.Width / 0.9);
+  const [inputWidth, setInputWidth] = useState(
+    SIZES.Width / 0.9
+  );
   const [searching, setSearching] = useState(false);
-  const { fadeEffect } = useFadeInOutAnim({ focusedBar });
 
-  const { slideAnimation, forceSlideAnimation } = useSlideOnKeyboard(
+  const { fadeEffect } = useFadeInOutAnim({
+    focusedBar,
+  });
+
+  const {
+    slideAnimation,
+    forceSlideAnimation,
+  } = useSlideOnKeyboard(
     SIZES.Width * 0.75,
     SIZES.Width * 0.92
   );
 
   const handleFocus = () => {
-    beginSearch();
     forceSlideAnimation(true);
-    clearTimeout();
     setFocusedBar(true);
     setSearching(true);
     setInputWidth(SIZES.Width * 0.7);
@@ -51,22 +63,45 @@ const Search = ({ navigation }) => {
     forceSlideAnimation(false);
     setFocusedBar(false);
     setSearching(false);
+    setSearchKey("");
     Keyboard.dismiss();
     setInputWidth(SIZES.Width * 0.8);
   };
 
   const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false }
+    [
+      {
+        nativeEvent: {
+          contentOffset: {
+            y: scrollY,
+          },
+        },
+      },
+    ],
+    {
+      useNativeDriver: false,
+    }
   );
 
+  const results =
+    searchKey.trim().length > 0
+      ? searchResult
+      : users;
+
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView
+      style={styles.container}
+      edges={["top", "bottom"]}
+    >
       <Animated.View
         style={[
           styles.header(70),
           {
-            transform: [{ translateY: headerTranslate }],
+            transform: [
+              {
+                translateY: headerTranslate,
+              },
+            ],
           },
         ]}
       >
@@ -74,14 +109,18 @@ const Search = ({ navigation }) => {
           <Animated.View
             style={[
               styles.searchWrapper,
-              { width: slideAnimation },
-              { opacity: headerOpacity },
+              {
+                width: slideAnimation,
+              },
+              {
+                opacity: headerOpacity,
+              },
             ]}
           >
             <Ionicons
               name="search"
               size={18}
-              color={"#999"}
+              color="#999"
               style={styles.searchIcon}
             />
 
@@ -92,21 +131,34 @@ const Search = ({ navigation }) => {
               autoCapitalize="none"
               autoCorrect={false}
               placeholder="Search"
-              placeholderTextColor={"#999"}
-              style={[styles.searchInput, { width: inputWidth }]}
+              placeholderTextColor="#999"
+              style={[
+                styles.searchInput,
+                {
+                  width: inputWidth,
+                },
+              ]}
               enterKeyHint="search"
-              onFocus={() => handleFocus()}
+              returnKeyType="search"
+              onFocus={handleFocus}
             />
           </Animated.View>
+
           {focusedBar && (
-            <TouchableOpacity onPress={() => handleCancel()}>
-              <Text style={styles.cancelBtn}>Cancel</Text>
+            <TouchableOpacity onPress={handleCancel}>
+              <Text style={styles.cancelBtn}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           )}
         </View>
       </Animated.View>
+
       <View style={styles.result}>
-        <DefaultPosts navigation={navigation} handleScroll={handleScroll} />
+        <DefaultPosts
+          navigation={navigation}
+          handleScroll={handleScroll}
+        />
 
         {searching && (
           <Animated.View
@@ -119,7 +171,7 @@ const Search = ({ navigation }) => {
           >
             <Searching
               navigation={navigation}
-              searchResult={searchKey.length > 0 ? searchResult : users}
+              searchResult={results}
               currentUser={currentUser}
             />
           </Animated.View>
@@ -136,6 +188,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
+
   header: (ContainerHeight) => ({
     position: "absolute",
     left: 0,
@@ -145,11 +198,13 @@ const styles = StyleSheet.create({
     zIndex: 1,
     backgroundColor: "#000",
   }),
+
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
     paddingTop: 22,
   },
+
   searchWrapper: {
     marginLeft: SIZES.Width * 0.03,
     backgroundColor: "#252525",
@@ -158,23 +213,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+
   searchIcon: {
     marginLeft: 8,
   },
+
   searchInput: {
     color: "#fff",
     height: "100%",
     marginLeft: 5,
   },
+
   cancelBtn: {
     color: "#fff",
     fontWeight: "500",
     fontSize: 16,
     marginLeft: 15,
   },
+
   result: {
     flex: 1,
   },
+
   searchingContainer: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#000",

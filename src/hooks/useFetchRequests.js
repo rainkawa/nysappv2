@@ -1,5 +1,11 @@
-import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import {
+  collection,
+  documentId,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "../services/firebase";
 
 const useFetchRequests = ({ user }) => {
@@ -7,37 +13,78 @@ const useFetchRequests = ({ user }) => {
   const [requests, setRequests] = useState([]);
 
   useEffect(() => {
-    if (!user?.followers_request || user.followers_request.length < 1) {
+    const requestIds = Array.isArray(
+      user?.followers_request
+    )
+      ? user.followers_request.filter(Boolean)
+      : [];
+
+    if (requestIds.length === 0) {
       setRequests([]);
-      return;
+      setLoader(false);
+      return undefined;
     }
 
-    if (!loader) {
-      setLoader(true);
+    const chunks = [];
 
-      const usersCollection = collection(db, "users");
+    for (let i = 0; i < requestIds.length; i += 30) {
+      chunks.push(requestIds.slice(i, i + 30));
+    }
 
-      const q = query(
-        usersCollection,
-        where("__name__", "in", user.followers_request)
+    setLoader(true);
+
+    const unsubscribers = [];
+    const usersById = new Map();
+
+    chunks.forEach((chunk) => {
+      const requestsQuery = query(
+        collection(db, "users"),
+        where(documentId(), "in", chunk)
       );
 
       const unsubscribe = onSnapshot(
-        q,
+        requestsQuery,
         (snapshot) => {
-          setRequests(
-            snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+          snapshot.docs.forEach((requestDoc) => {
+            usersById.set(requestDoc.id, {
+              id: requestDoc.id,
+              ...requestDoc.data(),
+            });
+          });
+
+          const orderedRequests = requestIds
+            .map((id) => usersById.get(id))
+            .filter(Boolean);
+
+          setRequests(orderedRequests);
+
+          const loaded = chunks.every((ids) =>
+            ids.every((id) =>
+              usersById.has(id)
+            )
           );
-          setLoader(false);
+
+          if (loaded) {
+            setLoader(false);
+          }
         },
         (error) => {
-          console.log(error);
+          console.error(
+            "useFetchRequests error:",
+            error
+          );
           setLoader(false);
         }
       );
 
-      return () => unsubscribe();
-    }
+      unsubscribers.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribers.forEach((unsubscribe) =>
+        unsubscribe()
+      );
+    };
   }, [user?.followers_request]);
 
   return {

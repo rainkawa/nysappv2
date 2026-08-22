@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   collection,
+  documentId,
+  onSnapshot,
   query,
   where,
-  onSnapshot,
-  documentId,
 } from "firebase/firestore";
 import { db } from "../services/firebase";
 
@@ -13,34 +13,80 @@ const useFetchFollowing = ({ user }) => {
   const [following, setFollowing] = useState([]);
 
   useEffect(() => {
-    if (user.following.length < 1) {
+    const followingIds = Array.isArray(user?.following)
+      ? user.following.filter(Boolean)
+      : [];
+
+    if (followingIds.length === 0) {
       setFollowing([]);
-      return;
+      setLoader(false);
+      return undefined;
     }
 
-    if (!loader) {
-      setLoader(true);
-      try {
-        const q = query(
-          collection(db, "users"),
-          where(documentId(), "in", user.following)
-        );
+    // Firestore "in" queries accept a maximum of 30 values.
+    const chunks = [];
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-          setFollowing(snapshot.docs.map((doc) => doc.data()));
-        });
-
-        return () => unsubscribe();
-      } catch (error) {
-        console.log(error);
-      } finally {
-        setLoader(false);
-      }
+    for (let i = 0; i < followingIds.length; i += 30) {
+      chunks.push(followingIds.slice(i, i + 30));
     }
-  }, [user.following]);
+
+    setLoader(true);
+
+    const unsubscribers = [];
+    const usersById = new Map();
+
+    chunks.forEach((chunk) => {
+      const usersQuery = query(
+        collection(db, "users"),
+        where(documentId(), "in", chunk)
+      );
+
+      const unsubscribe = onSnapshot(
+        usersQuery,
+        (snapshot) => {
+          snapshot.docs.forEach((userDoc) => {
+            usersById.set(userDoc.id, {
+              id: userDoc.id,
+              ...userDoc.data(),
+            });
+          });
+
+          const orderedFollowing = followingIds
+            .map((id) => usersById.get(id))
+            .filter(Boolean);
+
+          setFollowing(orderedFollowing);
+
+          const allChunksLoaded = chunks.every((ids) =>
+            ids.every((id) => usersById.has(id))
+          );
+
+          if (allChunksLoaded) {
+            setLoader(false);
+          }
+        },
+        (error) => {
+          console.error(
+            "useFetchFollowing error:",
+            error
+          );
+          setLoader(false);
+        }
+      );
+
+      unsubscribers.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribers.forEach((unsubscribe) =>
+        unsubscribe()
+      );
+    };
+  }, [user?.following]);
 
   return {
     following,
+    loader,
   };
 };
 

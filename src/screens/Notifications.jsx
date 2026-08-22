@@ -6,103 +6,63 @@ import {
   FlatList,
   Platform,
 } from "react-native";
-import { useEffect, useState } from "react";
 import { MaterialIcons, AntDesign } from "@expo/vector-icons";
 import Requests from "../components/follow/Requests";
 import Interaction from "../components/notifications/Interaction";
 import useFetchRequests from "../hooks/useFetchRequests";
-import useFetchUserPosts from "../hooks/useFetchUserPosts";
+import useFetchNotifications from "../hooks/useFetchNotifications";
 import { LinearGradient } from "expo-linear-gradient";
 import { SIZES } from "../constants";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../services/firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const Notifications = ({ navigation, route }) => {
   const currentUser = route?.params?.currentUser;
 
-  const { posts = [] } = useFetchUserPosts(currentUser?.email);
-  const { requests = [] } = useFetchRequests({
+  const {
+    notifications = [],
+  } = useFetchNotifications({
     user: currentUser,
   });
 
-  const [notificationCounter, setNotificationCounter] = useState(0);
-
-  useEffect(() => {
-    if (!currentUser?.email) return;
-
-    const resetEventNotification = async () => {
-      if ((currentUser?.event_notification ?? 0) > 0) {
-        try {
-          await updateDoc(doc(db, "users", currentUser.email), {
-            event_notification: 0,
-          });
-        } catch (error) {
-          console.log("Notification reset error:", error);
-        }
-      }
-    };
-
-    resetEventNotification();
-  }, [currentUser?.email]);
-
-  useEffect(() => {
-    if (!currentUser?.email) return;
-
-    let counter = 0;
-
-    for (const post of posts) {
-      if (!post || post.id === "empty") continue;
-
-      const comments = Array.isArray(post.comments)
-        ? post.comments
-        : [];
-
-      const newLikes = Array.isArray(post.new_likes)
-        ? post.new_likes
-        : [];
-
-      if (comments.length > 0) {
-        const lastComment = comments[comments.length - 1];
-
-        if (lastComment?.email !== currentUser.email) {
-          counter++;
-        }
-      }
-
-      if (newLikes.length > 0) {
-        counter++;
-      }
-    }
-
-    const followerRequests = Array.isArray(currentUser.followers_request)
-      ? currentUser.followers_request
-      : [];
-
-    counter += followerRequests.length;
-
-    setNotificationCounter(counter);
-  }, [posts, currentUser]);
-
-  const validPosts = posts.filter(
-    (post) => post && post.id !== "empty"
-  );
+  const {
+    requests = [],
+  } = useFetchRequests({
+    user: currentUser,
+  });
 
   if (!currentUser) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.footerContainer}>
-          <Text style={styles.title}>User information unavailable</Text>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.button}>Back</Text>
+          <Text style={styles.title}>
+            User information unavailable
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.button}>
+              Back
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
+  const activeNotifications = notifications.filter(
+    (item) => item?.deleted !== true
+  );
+
+  const hasContent =
+    requests.length > 0 ||
+    activeNotifications.length > 0;
+
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView
+      style={styles.container}
+      edges={["top", "bottom"]}
+    >
       <TouchableOpacity
         onPress={() => navigation.goBack()}
         style={styles.titleContainer}
@@ -112,88 +72,64 @@ const Notifications = ({ navigation, route }) => {
           size={22}
           color="#fff"
         />
-        <Text style={styles.textTitle}>Notifications</Text>
+
+        <Text style={styles.textTitle}>
+          Notifications
+        </Text>
       </TouchableOpacity>
 
-      {notificationCounter > 0 ? (
-        <View style={{ flex: 1 }}>
-          {Array.isArray(currentUser.followers_request) &&
-            currentUser.followers_request.length > 0 && (
-              <View>
-                <Text style={styles.subtitle}>
-                  Followers Requests:
-                </Text>
+      {hasContent ? (
+        <FlatList
+          data={[
+            ...requests.map((request, index) => ({
+              type: "request",
+              id: `request-${request?.email || index}`,
+              request,
+            })),
 
-                <FlatList
-                  data={requests}
-                  keyExtractor={(item, index) =>
-                    item?.email || index.toString()
-                  }
-                  renderItem={({ item }) => (
-                    <Requests user={item} />
-                  )}
+            ...activeNotifications.map(
+              (notification) => ({
+                type: "notification",
+                id: `notification-${notification.id}`,
+                notification,
+              })
+            ),
+          ]}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => {
+            if (item.type === "request") {
+              return (
+                <Requests
+                  user={item.request}
+                  currentUser={currentUser}
+                  navigation={navigation}
                 />
-              </View>
-            )}
-
-          <FlatList
-            data={validPosts}
-            keyExtractor={(item, index) =>
-              item?.id || index.toString()
+              );
             }
-            renderItem={({ item }) => {
-              const comments = Array.isArray(item.comments)
-                ? item.comments
-                : [];
 
-              const newLikes = Array.isArray(item.new_likes)
-                ? item.new_likes
-                : [];
-
-              if (
-                comments.length > 0 &&
-                comments[comments.length - 1]?.username !==
-                  currentUser.username
-              ) {
-                return (
-                  <Interaction
-                    navigation={navigation}
-                    item={{
-                      ...item,
-                      comments,
-                      new_likes: newLikes,
-                    }}
-                    currentUser={currentUser}
-                    text="commented"
-                  />
-                );
-              }
-
-              if (newLikes.length > 0) {
-                return (
-                  <Interaction
-                    navigation={navigation}
-                    item={{
-                      ...item,
-                      comments,
-                      new_likes: newLikes,
-                    }}
-                    currentUser={currentUser}
-                    text="liked"
-                  />
-                );
-              }
-
-              return null;
-            }}
-          />
-        </View>
+            return (
+              <Interaction
+                navigation={navigation}
+                notification={item.notification}
+                currentUser={currentUser}
+              />
+            );
+          }}
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={
+            <View style={{ height: 40 }} />
+          }
+        />
       ) : (
         <View style={styles.footerContainer}>
           <LinearGradient
             start={[0.9, 0.45]}
             end={[0.07, 1.03]}
-            colors={["#ff00ff", "#ff4400", "#ffff00"]}
+            colors={[
+              "#ff00ff",
+              "#ff4400",
+              "#ffff00",
+            ]}
             style={styles.rainbowBorder}
           >
             <AntDesign
@@ -208,7 +144,7 @@ const Notifications = ({ navigation, route }) => {
           </Text>
 
           <Text style={styles.text}>
-            There are no notifications from the past 30 days.
+            There are no notifications yet.
           </Text>
 
           <TouchableOpacity
@@ -238,7 +174,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 20,
     marginTop: 14,
-    marginBottom: Platform.OS === "android" ? 20 : 4,
+    marginBottom:
+      Platform.OS === "android" ? 20 : 4,
     gap: 3,
   },
 
@@ -248,13 +185,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 4,
     transform: [{ scaleY: 1.1 }],
-  },
-
-  subtitle: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 17,
-    marginHorizontal: 20,
   },
 
   footerContainer: {
@@ -282,7 +212,7 @@ const styles = StyleSheet.create({
   },
 
   text: {
-    color: "#fff",
+    color: "#999",
     fontSize: 14,
     textAlign: "center",
   },

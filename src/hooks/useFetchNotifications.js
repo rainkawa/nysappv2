@@ -1,40 +1,68 @@
-import { useState, useEffect } from "react";
-import { collection, doc, onSnapshot } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+} from "firebase/firestore";
 import { db } from "../services/firebase";
 
-const useFetchRequests = ({ user }) => {
+const useFetchNotifications = ({ user }) => {
   const [loader, setLoader] = useState(false);
   const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
-    if (!loader) {
-      setLoader(true);
-      try {
-        const notificationsRef = collection(
-          db,
-          "users",
-          user.email,
-          "notifications"
+    if (!user?.email) {
+      setNotifications([]);
+      setLoader(false);
+      return undefined;
+    }
+
+    setLoader(true);
+
+    const notificationsRef = collection(
+      db,
+      "users",
+      user.email,
+      "notifications"
+    );
+
+    const notificationsQuery = query(
+      notificationsRef,
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(
+      notificationsQuery,
+      (snapshot) => {
+        const data = snapshot.docs.map(
+          (notificationDoc) => ({
+            id: notificationDoc.id,
+            ...notificationDoc.data(),
+          })
         );
 
-        const unsubscribe = onSnapshot(notificationsRef, (snapshot) => {
-          setNotifications(
-            snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-          );
-          setLoader(false);
-        });
+        setNotifications(data);
+        setLoader(false);
+      },
+      (error) => {
+        console.error(
+          "useFetchNotifications error:",
+          error
+        );
 
-        return () => unsubscribe();
-      } catch (error) {
-        console.log(error);
+        setNotifications([]);
         setLoader(false);
       }
-    }
-  }, [user.email]);
+    );
+
+    return unsubscribe;
+  }, [user?.email]);
 
   return {
     notifications,
+    loader,
   };
 };
 
-export default useFetchRequests;
+export default useFetchNotifications;

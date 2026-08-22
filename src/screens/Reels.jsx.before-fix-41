@@ -1,0 +1,227 @@
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  FlatList,
+  Platform,
+  RefreshControl,
+} from "react-native";
+import { useState, useRef } from "react";
+import { SIZES } from "../constants";
+import {
+  Ionicons,
+  MaterialIcons,
+} from "@expo/vector-icons";
+import useFetchReels from "../hooks/useFetchReels";
+import Skeleton from "../components/reels/Skeleton";
+import Reel from "../components/reels/Reel";
+import MessageModal, {
+  handleFeatureNotImplemented,
+} from "../components/shared/modals/MessageModal";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const Reels = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
+  const flatListRef = useRef(null);
+
+  const {
+    videos = [],
+    refreshReels,
+    isLoading,
+  } = useFetchReels();
+
+  const [
+    messageModalVisible,
+    setMessageModalVisible,
+  ] = useState(false);
+
+  const [
+    playingIndexes,
+    setPlayingIndexes,
+  ] = useState({ 0: true });
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const handleRefresh = () => {
+    if (refreshing) return;
+
+    setRefreshing(true);
+
+    try {
+      refreshReels();
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 500);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity
+          onPress={() =>
+            handleFeatureNotImplemented(
+              setMessageModalVisible
+            )
+          }
+          style={styles.titleContainer}
+        >
+          <Text style={styles.titleText}>
+            Reels
+          </Text>
+
+          <MaterialIcons
+            name="keyboard-arrow-down"
+            size={19}
+            color="#fff"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate(
+              "MediaLibrary",
+              {
+                initialSelectedType:
+                  "New reel",
+              }
+            )
+          }
+          hitSlop={10}
+        >
+          <Ionicons
+            name="camera-outline"
+            size={27}
+            color="#fff"
+          />
+        </TouchableOpacity>
+      </View>
+
+      {videos.length > 0 ? (
+        <FlatList
+          ref={flatListRef}
+          data={videos}
+          renderItem={({ item }) => (
+            <Reel
+              item={item}
+              playingIndexes={
+                playingIndexes
+              }
+              index={item?.index}
+              navigation={navigation}
+              setMessageModalVisible={
+                setMessageModalVisible
+              }
+              handleFeatureNotImplemented={
+                handleFeatureNotImplemented
+              }
+            />
+          )}
+          keyExtractor={(item, index) =>
+            item?.id?.toString() ||
+            index.toString()
+          }
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
+          windowSize={4}
+          pagingEnabled
+          refreshControl={
+            <RefreshControl
+              refreshing={
+                refreshing || isLoading
+              }
+              onRefresh={handleRefresh}
+              tintColor="#fff"
+              colors={["#fff"]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          onMomentumScrollEnd={(event) => {
+            const height =
+              event.nativeEvent
+                .layoutMeasurement
+                .height;
+
+            if (!height) return;
+
+            const newIndex =
+              Math.round(
+                event.nativeEvent
+                  .contentOffset.y /
+                  height
+              );
+
+            setPlayingIndexes({
+              [newIndex]: true,
+            });
+          }}
+        />
+      ) : (
+        <View style={styles.skeleton}>
+          <Skeleton />
+        </View>
+      )}
+
+      <MessageModal
+        messageModalVisible={
+          messageModalVisible
+        }
+        message={
+          "This feature is not yet implemented."
+        }
+        height={20}
+      />
+
+      <View
+        style={{
+          height: insets.bottom,
+        }}
+      />
+    </View>
+  );
+};
+
+export default Reels;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+
+  headerContainer: {
+    position: "absolute",
+    top:
+      Platform.OS === "android"
+        ? 31
+        : 27,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginHorizontal: 16,
+    zIndex: 10,
+  },
+
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 1,
+  },
+
+  titleText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 20,
+  },
+
+  skeleton: {
+    flex: 1,
+  },
+});
